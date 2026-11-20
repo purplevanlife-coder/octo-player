@@ -56,6 +56,7 @@ Started: 2026-11-19 (America/Los_Angeles).
 | 44670710951 | feature/discover-v1 | Discover v1 (04b76a8f remote) | **cancelled** | Everything compiled (KSP + app + unit-test sources, zero errors) and shared-core tests passed (incl. the fixed PlayerUpdaterTest — no FAILED lines, build advanced). `:app:testDebugUnitTest` then ran 15 min without finishing; coordinator cancelled it to bisect rather than wait blind. Workflow split into per-suite steps with a 40-min cap on app tests and always-uploaded test reports (commit 201fe86f) so any stall is pinpointed by which test classes completed. |
 | 44673134804 | feature/discover-v1 | + CI split (b8ee95f8 remote) | **failure** | Shared-core tests **passed** (5m). App tests: 725 classes / 3,531 tests completed with exactly **one failure** — upstream's `WholeTableGateTest` caught `DiscoverRepository` calling the whole-table `users.likedTracks()` (the gate forbids new whole-table reads; every other signal read was already bounded). All 9 new Discover test classes passed. The step then hit its 40-min cap a whisker from the end (last class finished 04:58:29, cap 05:00:15) — the suite is simply big. Fixes: bounded `UserDao.likedTracksLimited(limit)` (same SQL + LIMIT, newest-first) used by the repository; app-test cap raised to 60 min. |
 | 44678219131 | feature/discover-v1 | + gate fix (18d9662e remote) | **failure** | Shared tests passed; app suite ran to completion inside the 60-min cap: 726 classes / 3,531 tests, still exactly one failure — the gate moved to `UserDao.kt`: it scans raw text, and the explanatory comment on the new DAO method contained the literal whole-table call text, tripping the "streams now" rule for that file. Fixed by rewording the comment; a local simulation of the gate (its own regexes/sets run over the source tree) then reported zero callers and zero violations. |
+| 44683285029 | feature/discover-v1 | + comment fix (609d9a1a remote) | **SUCCESS** | **Phase 1 green.** Shared-core tests passed; app suite: 726 classes, **3,531 tests, 0 failures, 0 errors** (18 skipped); debug APK built and uploaded. APK verified as the fork build: package `app.winters.octo.debug`, versionName `0.2.0-debug`, and the dex contains the Discover classes (`DiscoverScreen`, 81 references to `app/winters/octo/discover` in classes18.dex). Delivered to `~/workspace/your_files/octo-player-debug/app-debug.apk` (97,926,559 bytes), replacing the stock baseline. **Not yet device-tested — only Collin's phone test proves it works.** |
 
 ## Notes
 
@@ -71,6 +72,11 @@ Started: 2026-11-19 (America/Los_Angeles).
 ## APK deliveries
 
 - Stock baseline: `~/workspace/your_files/octo-player-debug/app-debug.apk` (from run 44644606689).
+- **Discover v1: same path, replaced 2026-11-20 after verification** — from run 44683285029
+  (feature/discover-v1 @ 609d9a1a remote), 97,926,559 bytes, package app.winters.octo.debug.
+  Note: CI debug builds are signed with the runner's debug key, which differs per run —
+  installing over the stock baseline may require uninstalling the old debug build first
+  (same lesson as the Solar app). A fixed debug keystore is a worthwhile follow-up.
 
 ### Phase 1 — Discover v1 implemented (2026-11-19, Claude Code session, ~25 min)
 
