@@ -267,7 +267,7 @@ class DiscoverRepository @Inject constructor(
         // The server's lists and chart, read while the chains are walked.
         val madeForYou = async<List<Station>?> { if (session.runsOcto) call { discovery.madeForYou() } else emptyList() }
         val stations = async<List<Station>?> { if (session.runsOcto) call { discovery.stations().filter { it.streamUrl == null } } else emptyList() }
-        val chart = async {
+        val chart = async<List<TrackEntity>?> {
             when (val answer = call { charts.answer(CHART_OVERALL) }) {
                 is ChartAnswer.Got -> answer.list.songs.take(CHARTS_ROW).map { it.track }
                 ChartAnswer.None -> emptyList()
@@ -308,7 +308,7 @@ class DiscoverRepository @Inject constructor(
             asks += async { ranked(call { client.similarSongs(c.artist.serverId, CHAIN_SIMILAR_SONGS) }, c.score * SIMILAR_SONG_SHARE) }
         }
         val found = asks.awaitAll().flatten()
-        val tracks = if (found.isEmpty()) emptyList() else answerOf { discovery.resolveInPlace(found.map { it.first }) }.orEmpty()
+        val tracks: List<TrackEntity?> = if (found.isEmpty()) emptyList() else answerOf { discovery.resolveInPlace(found.map { it.first }) }.orEmpty()
         val picks = found.zip(tracks).mapNotNull { (sent, track) ->
             track?.let { Pick(it, sent.first.genre?.takeIf(String::isNotBlank), sent.first.year?.takeIf { y -> y > 0 }, sent.second) }
         }
