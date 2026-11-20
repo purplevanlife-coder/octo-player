@@ -309,7 +309,7 @@ private fun CircleStage(
     val ringColor = Color(ForestGlass.Text)
     Box(
         Modifier
-            .size(width = side, height = side + TimesRoom)
+            .size(width = side, height = side + RingTimesRoom)
             .graphicsLayer { alpha = 1f - fold },
     ) {
         Box(
@@ -402,7 +402,8 @@ private fun CircleStage(
 }
 
 // The room under the circle for the times and the quality label.
-private val TimesRoom = 16.dp
+// (Named apart from LivePlayerParts' TimesRoom, which is a different 24.dp.)
+private val RingTimesRoom = 16.dp
 
 // Places what it is given with its top centre at (x, y) from the top left
 // of its parent, whatever its own size.
