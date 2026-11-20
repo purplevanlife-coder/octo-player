@@ -30,9 +30,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.winters.octo.design.LocalOctoFonts
 import app.winters.octo.design.LocalThemeWrapper
 import app.winters.octo.design.OctoTheme
 import app.winters.octo.design.ProvideOctoTheme
+import app.winters.octo.design.fontsFor
 import app.winters.octo.ui.settings.AccentSeed
 import app.winters.octo.ui.settings.AccentViewModel
 
@@ -109,6 +111,7 @@ fun ThemeRoot(
         LocalDeviceDark provides deviceDark,
         LocalBarRequest provides request,
         LocalThemeWrapper provides MaterialWrapper,
+        LocalOctoFonts provides fontsFor(active),
     ) {
         Box(Modifier.fillMaxSize()) {
             ProvideOctoTheme(palette) { content() }
