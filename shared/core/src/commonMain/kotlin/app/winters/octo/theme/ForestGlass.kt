@@ -40,8 +40,12 @@ object ForestGlass {
     // --danger.
     const val Danger: Int = 0xFFF0927F.toInt()
 
-    // .player-bar: near-opaque dark olive, rgba(19, 26, 16, 0.94).
+    // .player-bar: near-opaque dark olive, rgba(19, 26, 16, 0.94), with a
+    // hairline top edge (the glass edge) and a soft upward shadow,
+    // 0 -8px 24px rgba(5, 8, 4, 0.35) (the glass shadow's colour).
     const val PlayerBar: Int = 0xF0131A10.toInt()
+    const val PlayerBarShadowBlur: Float = 24f
+    const val PlayerBarShadowY: Float = -8f
 
     // .glass: rgba(24, 31, 20, 0.55) fill, rgba(244, 238, 221, 0.16) edge,
     // 0 8px 28px rgba(5, 8, 4, 0.35) shadow, blur(16px) saturate(1.25).

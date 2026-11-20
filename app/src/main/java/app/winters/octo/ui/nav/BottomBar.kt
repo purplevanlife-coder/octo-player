@@ -61,12 +61,13 @@ import app.winters.octo.ui.common.SongTitle
 import app.winters.octo.ui.common.fadingMarquee
 import app.winters.octo.ui.common.LocalReduceMotion
 import app.winters.octo.R
-import app.winters.octo.design.FloatingGlaze
+import app.winters.octo.design.BarGlass
 import app.winters.octo.design.GlazeSelected
 import app.winters.octo.design.GlazeTint
 import app.winters.octo.design.OctoColors
 import app.winters.octo.design.OctoIcons
 import app.winters.octo.design.OctoType
+import app.winters.octo.design.bodyType
 import app.winters.octo.playback.NowPlaying
 import app.winters.octo.player.LiveStopIcon
 import app.winters.octo.player.fractionAt
@@ -159,7 +160,7 @@ fun BottomBar(
         val fullTabs = maxWidth - BarHeight - Gap
         val tabsWidth = lerp(fullTabs, BarHeight, grown)
         TabBar(haze, selected, grown, playerShown, fullTabs, Modifier.width(tabsWidth), actions, film, marks)
-        FloatingGlaze(
+        BarGlass(
             haze,
             Modifier
                 .offset(x = tabsWidth + Gap)
@@ -221,7 +222,7 @@ private fun TabBar(
     film: Color,
     marks: Map<Int, String>,
 ) {
-    FloatingGlaze(
+    BarGlass(
         haze,
         modifier
             .fillMaxHeight()
@@ -401,7 +402,7 @@ private fun PlayerCapsule(
                 Text(
                     // While a play starts, the words say so in the artist's place.
                     now.starting ?: now.artist.orEmpty(),
-                    style = OctoType.caption.copy(fontSize = 11.sp),
+                    style = bodyType(OctoType.caption.copy(fontSize = 11.sp)),
                     color = OctoColors.TextMuted,
                     maxLines = 1,
                     softWrap = false,

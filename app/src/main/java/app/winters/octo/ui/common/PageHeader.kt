@@ -39,6 +39,7 @@ import app.winters.octo.design.OctoColors
 import app.winters.octo.design.OctoIcons
 import app.winters.octo.design.OctoInk
 import app.winters.octo.design.OctoType
+import app.winters.octo.design.displayType
 import app.winters.octo.player.capMiddle
 import app.winters.octo.player.rememberCapHeightPx
 import kotlin.math.max
@@ -132,16 +133,19 @@ private fun TitleLine(title: String, onBack: (() -> Unit)?, count: String?, shor
     val density = LocalDensity.current
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val room = constraints.maxWidth - if (onBack != null) with(density) { (HeaderButtonSize + Gap).roundToPx() } else 0
-        val style = remember(title, room, measurer) {
-            val full = measurer.measure(title, HeaderTitle, maxLines = 1, softWrap = false).size.width
+        // The theme's display face, where it names one; measured in that
+        // face so the fit is the face's own.
+        val titleStyle = displayType(HeaderTitle)
+        val style = remember(title, room, measurer, titleStyle) {
+            val full = measurer.measure(title, titleStyle, maxLines = 1, softWrap = false).size.width
             // A hair under the exact fit, so rounding never pushes the last letter past the edge.
             val scale = titleScale(full, room).let { if (it < 1f) it * 0.99f else it }
             if (scale >= 1f) {
-                HeaderTitle
+                titleStyle
             } else {
-                HeaderTitle.copy(
-                    fontSize = HeaderTitle.fontSize * scale,
-                    lineHeight = if (HeaderTitle.lineHeight.isSpecified) HeaderTitle.lineHeight * scale else HeaderTitle.lineHeight,
+                titleStyle.copy(
+                    fontSize = titleStyle.fontSize * scale,
+                    lineHeight = if (titleStyle.lineHeight.isSpecified) titleStyle.lineHeight * scale else titleStyle.lineHeight,
                 )
             }
         }

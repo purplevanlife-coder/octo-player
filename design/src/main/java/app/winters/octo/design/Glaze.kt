@@ -71,8 +71,9 @@ class GlazeLight(
 // The film: clear glass with the faintest dim, so whatever is behind (the
 // page, or a song's colours) shows through in its own colour without
 // glaring when it is bright. The bar can lay a trace of the song's colour
-// over it.
-val GlazeTint: Color @Composable @ReadOnlyComposable get() = glassFilm(0.16f)
+// over it. A theme with a glass recipe of its own (ThemeGlass) gives its
+// own film.
+val GlazeTint: Color @Composable @ReadOnlyComposable get() = ThemeGlass.film ?: glassFilm(0.16f)
 
 // The film for glass over one smooth field of colour, like the player's
 // background: none at all. With no detail behind to blur, a dim reads as a
@@ -198,8 +199,8 @@ fun Glaze(
     light: GlazeLight = GlazeLight.Rest,
     backdrop: HazeState? = null,
     film: Color = GlazeTint,
-    frost: Float = GlazeFrost,
-    saturation: Float = GlazeSaturation,
+    frost: Float = ThemeGlass.frost,
+    saturation: Float = ThemeGlass.saturation,
     focused: Boolean = LocalWindowFocused.current,
     // Frost every source on `backdrop`, not only the one behind by default:
     // glass floating over a page that is a source of its own.
@@ -210,6 +211,7 @@ fun Glaze(
 ) {
     val page = OctoColors.Background
     val card = OctoColors.BackgroundTertiary
+    val edge = ThemeGlass.edge
     val blur = if (frost == GlazeFrost && saturation == GlazeSaturation) {
         GlazeBlur()
     } else {
@@ -242,7 +244,9 @@ fun Glaze(
                 // A lifted glaze takes a hint of the accent; on a light theme
                 // at most 6%, so a lit disc stays glass.
                 .background(accent(if (LocalOctoSurfaces.current.light) light.lift.coerceAtMost(0.06f) else light.lift))
-                .then(if (focused) Modifier.litRim(shape, light) else Modifier),
+                .then(if (focused) Modifier.litRim(shape, light) else Modifier)
+                // The theme's hairline, where its glass has one.
+                .then(if (edge != null) Modifier.border(1.dp, edge, shape) else Modifier),
         )
         // Specular: a brighter rim, masked to the middle.
         if (focused) Specular(shape, accent(light.spec), accent(light.specSoft))
@@ -302,8 +306,8 @@ fun FloatingGlaze(
     modifier: Modifier = Modifier,
     shape: Shape = CircleShape,
     film: Color = GlazeTint,
-    frost: Float = GlazeFrost,
-    saturation: Float = GlazeSaturation,
+    frost: Float = ThemeGlass.frost,
+    saturation: Float = ThemeGlass.saturation,
     halo: Boolean = false,
     seesAll: Boolean = false,
     picture: GlassBackdrop? = null,
@@ -314,14 +318,20 @@ fun FloatingGlaze(
             Box(Modifier.matchParentSize().dropShadow(shape, Shadow(radius = shadowBlur(20f), color = shadowColor(0.5f))))
         }
         // The shadow is cast by a shape 12dp smaller on every side, so it
-        // pools under the glass instead of haloing around it.
+        // pools under the glass instead of haloing around it. A theme with a
+        // glass recipe of its own casts its own.
+        val drop = ThemeGlass.drop
         Box(
             Modifier
                 .matchParentSize()
                 .padding(12.dp)
                 .dropShadow(
                     shape,
-                    Shadow(radius = shadowBlur(24f), color = shadowColor(0.45f), offset = DpOffset(0.dp, 8.dp)),
+                    if (drop == null) {
+                        Shadow(radius = shadowBlur(24f), color = shadowColor(0.45f), offset = DpOffset(0.dp, 8.dp))
+                    } else {
+                        Shadow(radius = shadowBlur(drop.blur), color = drop.color, offset = DpOffset(0.dp, drop.y.dp))
+                    },
                 ),
         )
         // On a light theme a plate's edge is the theme's hairline alone, with

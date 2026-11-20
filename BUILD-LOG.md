@@ -103,6 +103,34 @@ Full write-up: `PHASE2-FOUNDATION-NOTES.md`.
   the new type tokens yet — the visible change in this build is the palette, launch
   screens and theme picker.
 
+### Phase 2 components — fonts, type tokens, glass, player bar (2026-11-20, Claude Code session)
+
+Per `PHASE2-COMPONENTS-BRIEF.md`. Four code commits (4db58259…ac110939) plus the notes
+commit. Full write-up: `PHASE2-COMPONENTS-NOTES.md`. No Gradle run, nothing pushed.
+
+- **Real faces:** Playfair Display (500/600/700) and DM Sans (400/500/600/700) are now
+  Music Space's display/body families (static TTFs in `design/res/font`, OFL licences in
+  `design/licenses`, credited in the README). Stand-ins removed.
+- **Type tokens applied:** `displayType()` / `bodyType()` wrap `OctoType` styles and change
+  only the face. Main reach is through shared components (PageHeader, SectionTitle,
+  SongTitle, Items.kt rows and cards), plus album/artist hero names, Home, Library,
+  Discover, Search, queue, downloads, and the mini/full player title + artist. The other
+  five themes get the identical style object back (pinned by tests).
+- **Per-theme glass:** `LocalOctoGlass` / `OctoGlass` (like `LocalOctoFonts`). Music Space
+  feeds the `.glass` recipe (film, 1dp cream edge, frost 16, saturation 1.25, shadow
+  28/8) into Glaze/FloatingGlaze defaults, glassPanel/raisedPanel and GlassSheet. The five
+  others keep the old global constants (every changed path falls back verbatim). Over art
+  (the player) all themes use Octo's glass.
+- **Player bar:** under Music Space the bar's tab and now-playing capsules sit on the
+  near-opaque `.player-bar` olive with a top hairline and an upward shadow, and **no
+  backdrop blur**. Other themes: the same FloatingGlaze as before.
+- **Skipped stretch:** per-theme 18 dp radius. There's no card/sheet radius token
+  (about 96 hard-coded corner sites), so it isn't low-risk.
+- **Tests:** ThemeFontsTest updated; new ThemeTypeTest, ThemeGlassTest. `resolved.txt`
+  byte-identical; palette untouched, so the foundation contrast margins are unchanged;
+  new glass surfaces hand-checked at ≥ 8.8:1 for `--dim`.
+- **CI result:** _(coordinator to fill in)_
+
 ## Notes
 
 - **Push route:** plain `git push` has no credential path on this VM. Commits are

@@ -1,5 +1,7 @@
 package app.winters.octo.ui.home
 
+import app.winters.octo.design.bodyType
+import app.winters.octo.design.displayType
 import app.winters.octo.ui.nav.ChartsRoute
 import app.winters.octo.ui.nav.HomeSectionsRoute
 import androidx.activity.compose.LocalActivity
@@ -260,7 +262,7 @@ private fun LazyListScope.playCountsCard(title: String, words: String, onTryAgai
                 .glassPanel(RoundedCornerShape(20.dp))
                 .padding(20.dp),
         ) {
-            Text(words, style = OctoType.bodySmall, color = OctoColors.TextSecondary)
+            Text(words, style = bodyType(OctoType.bodySmall), color = OctoColors.TextSecondary)
             AccentButton("Try again", onClick = onTryAgain, size = ButtonSize.Medium, modifier = Modifier.padding(top = 12.dp))
         }
     }
@@ -392,10 +394,10 @@ private fun AccessCard(access: Access, vm: HomeViewModel) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("Music on this phone", style = OctoType.bodySmall, color = OctoColors.TextPrimary)
+        Text("Music on this phone", style = bodyType(OctoType.bodySmall), color = OctoColors.TextPrimary)
         Text(
             "Allow access to play the music already on your phone here too.",
-            style = OctoType.caption,
+            style = bodyType(OctoType.caption),
             color = OctoColors.TextSecondary,
         )
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -443,10 +445,10 @@ private fun HomeCopyCard.slotKind(): String = when (this) {
 @Composable
 private fun EmptyCard(offerAccess: Boolean) {
     Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("No music yet", style = OctoType.headline, color = OctoColors.TextPrimary)
+        Text("No music yet", style = displayType(OctoType.headline), color = OctoColors.TextPrimary)
         Text(
             "Songs on this phone and on your server show up here on their own.",
-            style = OctoType.bodySmall,
+            style = bodyType(OctoType.bodySmall),
             color = OctoColors.TextMuted,
         )
         LibrarySourceActions(Modifier.padding(top = 12.dp), offerAccess = offerAccess)

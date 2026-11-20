@@ -105,16 +105,27 @@ private fun SheetBody(
                 val scope = rememberCoroutineScope()
                 val density = LocalDensity.current
                 var pull by remember { mutableFloatStateOf(0f) }
+                // The theme's glass shadow and hairline, where its glass has
+                // them; the sheet's own otherwise.
+                val glass = ThemeGlass
+                val drop = glass.drop
                 Column(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(max = if (tall) maxHeight else maxHeight * 0.7f)
                         .graphicsLayer { translationY = pull }
-                        .dropShadow(SheetShape, Shadow(radius = shadowBlur(32f), color = shadowColor(0.4f)))
+                        .dropShadow(
+                            SheetShape,
+                            if (drop == null) {
+                                Shadow(radius = shadowBlur(32f), color = shadowColor(0.4f))
+                            } else {
+                                Shadow(radius = shadowBlur(drop.blur), color = drop.color, offset = DpOffset(0.dp, drop.y.dp))
+                            },
+                        )
                         .clip(SheetShape)
                         .background(SheetFill)
                         // Light along the top edge, as on the other glass.
-                        .innerShadow(SheetShape, Shadow(radius = 0.dp, color = glassRim(0.10f), offset = DpOffset(0.dp, 1.dp)))
+                        .innerShadow(SheetShape, Shadow(radius = 0.dp, color = glass.edge ?: glassRim(0.10f), offset = DpOffset(0.dp, 1.dp)))
                         // Swallows taps so they do not reach the dim area.
                         .clickable(interactionSource = null, indication = null) {}
                         .navigationBarsPadding(),

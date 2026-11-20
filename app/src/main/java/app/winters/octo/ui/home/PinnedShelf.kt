@@ -1,6 +1,7 @@
 package app.winters.octo.ui.home
 
 import app.winters.octo.covers.playlistGlyph
+import app.winters.octo.design.bodyType
 import app.winters.octo.ui.common.phonePlaylistFooter
 import app.winters.octo.ui.common.PlaylistArtwork
 import androidx.compose.foundation.combinedClickable
@@ -108,11 +109,11 @@ private fun PinnedCard(
         Spacer(Modifier.height(8.dp))
         Text(
             title,
-            style = OctoType.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+            style = bodyType(OctoType.bodySmall.copy(fontWeight = FontWeight.SemiBold)),
             color = OctoColors.TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(subtitle, style = OctoType.caption, color = OctoColors.TextMuted, maxLines = 1)
+        Text(subtitle, style = bodyType(OctoType.caption), color = OctoColors.TextMuted, maxLines = 1)
     }
 }

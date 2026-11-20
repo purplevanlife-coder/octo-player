@@ -17,6 +17,7 @@ import app.winters.octo.design.GlazedIconButton
 import app.winters.octo.design.OctoColors
 import app.winters.octo.design.OctoIcons
 import app.winters.octo.design.OctoType
+import app.winters.octo.design.displayType
 
 // Content starts below the status bar and ends above the floating bar.
 @Composable
@@ -36,7 +37,7 @@ fun ScreenTitle(text: String, modifier: Modifier = Modifier) {
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        style = OctoType.section,
+        style = displayType(OctoType.section),
         color = OctoColors.TextPrimary,
         modifier = modifier.padding(horizontal = 20.dp, vertical = 10.dp),
     )

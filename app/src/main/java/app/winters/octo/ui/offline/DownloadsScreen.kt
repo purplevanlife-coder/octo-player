@@ -1,5 +1,6 @@
 package app.winters.octo.ui.offline
 
+import app.winters.octo.design.bodyType
 import app.winters.octo.ui.common.sortItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -353,7 +354,7 @@ private fun DownloadLine(
                     SongTitle(row.title, explicit = row.explicit == true, style = OctoType.bodySmall, color = OctoColors.TextPrimary)
                     Text(
                         listOf(row.artist, detail(progress)).filter { it.isNotEmpty() }.joinToString(" · "),
-                        style = OctoType.caption,
+                        style = bodyType(OctoType.caption),
                         color = if (row.state == DownloadStatus.Failed) OctoColors.TextSecondary else OctoColors.TextMuted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

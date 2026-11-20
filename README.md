@@ -129,4 +129,6 @@ cd octo-player
 ## Credits
 
 - [Inter](https://rsms.me/inter/) by Rasmus Andersson, under the SIL Open Font License 1.1 ([licence](design/licenses/Inter-OFL.txt)).
+- [Playfair Display](https://github.com/clauseggers/Playfair-Display) by Claus Eggers Sørensen, under the SIL Open Font License 1.1 ([licence](design/licenses/OFL-playfair-display.txt)). The Music Space theme's headings.
+- [DM Sans](https://github.com/googlefonts/dm-fonts) by Colophon Foundry, under the SIL Open Font License 1.1 ([licence](design/licenses/OFL-dm-sans.txt)). The Music Space theme's body text.
 - [Phosphor Icons](https://phosphoricons.com/), under the MIT License ([licence](design/licenses/Phosphor-MIT.txt)).

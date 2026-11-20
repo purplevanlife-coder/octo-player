@@ -29,6 +29,7 @@ import app.winters.octo.design.AccentButton
 import app.winters.octo.design.GlazeButton
 import app.winters.octo.design.OctoColors
 import app.winters.octo.design.OctoType
+import app.winters.octo.design.bodyType
 import app.winters.octo.design.glassPanel
 import app.winters.octo.playback.ListSpec
 import app.winters.octo.playback.PlaybackConnection
@@ -100,10 +101,10 @@ fun ResumeCard(vm: ResumeViewModel = hiltViewModel()) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text("Pick up where you left off on ${shown.device}", style = OctoType.caption, color = OctoColors.TextMuted)
-            Text(shown.title, style = OctoType.body, color = OctoColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("Pick up where you left off on ${shown.device}", style = bodyType(OctoType.caption), color = OctoColors.TextMuted)
+            Text(shown.title, style = bodyType(OctoType.body), color = OctoColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             shown.artist?.takeIf(String::isNotBlank)?.let {
-                Text(it, style = OctoType.bodySmall, color = OctoColors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(it, style = bodyType(OctoType.bodySmall), color = OctoColors.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AccentButton("Resume", onClick = { vm.resume(shown) }, loading = vm.loading)

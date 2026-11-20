@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import app.winters.octo.design.OctoColors
 import app.winters.octo.design.OctoIcons
 import app.winters.octo.design.OctoType
+import app.winters.octo.design.bodyType
 import app.winters.octo.discovery.Station
 import app.winters.octo.ui.common.ArtworkFill
 import app.winters.octo.ui.common.GlassIconButton
@@ -75,7 +76,7 @@ fun StationCard(station: Station, starting: Boolean, onOpen: () -> Unit, onPlay:
         Spacer(Modifier.height(8.dp))
         Text(
             station.name,
-            style = OctoType.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+            style = bodyType(OctoType.bodySmall.copy(fontWeight = FontWeight.SemiBold)),
             color = OctoColors.TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -83,7 +84,7 @@ fun StationCard(station: Station, starting: Boolean, onOpen: () -> Unit, onPlay:
         station.songCount?.let {
             Text(
                 songCountLine(it),
-                style = OctoType.bodySmall,
+                style = bodyType(OctoType.bodySmall),
                 color = OctoColors.TextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

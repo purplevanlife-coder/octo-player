@@ -41,6 +41,7 @@ import androidx.navigation3.runtime.NavKey
 import app.winters.octo.design.OctoColors
 import app.winters.octo.design.OctoIcons
 import app.winters.octo.design.OctoType
+import app.winters.octo.design.bodyType
 import app.winters.octo.design.glassPanel
 import app.winters.octo.discover.DiscoverArtist
 import app.winters.octo.discover.DiscoverBatch
@@ -119,7 +120,7 @@ fun DiscoverScreen(onOpen: (NavKey) -> Unit, vm: DiscoverViewModel = hiltViewMod
 @Composable
 private fun UpdatedLine(batch: DiscoverBatch, making: Boolean) {
     val words = updatedLine(batch.generatedAt, System.currentTimeMillis()) + if (making) " · Finding more…" else ""
-    Text(words, style = OctoType.caption, color = OctoColors.TextMuted, modifier = Modifier.padding(horizontal = 20.dp))
+    Text(words, style = bodyType(OctoType.caption), color = OctoColors.TextMuted, modifier = Modifier.padding(horizontal = 20.dp))
 }
 
 private fun LazyListScope.section(section: DiscoverSection, vm: DiscoverViewModel, onOpen: (NavKey) -> Unit) {
@@ -237,7 +238,7 @@ private fun Titles(section: DiscoverSection, onTitle: (() -> Unit)? = null) {
             SectionTitle(section.title)
         }
         section.subtitle?.let {
-            Text(it, style = OctoType.caption, color = OctoColors.TextMuted, modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp))
+            Text(it, style = bodyType(OctoType.caption), color = OctoColors.TextMuted, modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp))
         }
     }
 }
@@ -253,8 +254,8 @@ private fun LazyListScope.note(key: String, heading: String, words: String) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(heading, style = OctoType.bodySmall, color = OctoColors.TextPrimary)
-            Text(words, style = OctoType.caption, color = OctoColors.TextSecondary)
+            Text(heading, style = bodyType(OctoType.bodySmall), color = OctoColors.TextPrimary)
+            Text(words, style = bodyType(OctoType.caption), color = OctoColors.TextSecondary)
         }
     }
 }

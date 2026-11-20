@@ -1,5 +1,6 @@
 package app.winters.octo.ui.search
 
+import app.winters.octo.design.bodyType
 import app.winters.octo.ui.common.LocalReduceMotion
 import app.winters.octo.ui.common.LocalOwnedFinds
 import androidx.compose.animation.core.tween
@@ -447,7 +448,7 @@ private fun RecentList(
             ) {
                 Text(
                     query,
-                    style = OctoType.body,
+                    style = bodyType(OctoType.body),
                     color = OctoColors.TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -557,7 +558,7 @@ private fun OutsideLine(look: OutsideLook, query: String, kind: String, onRetry:
         }
         Text(
             text,
-            style = OctoType.bodySmall,
+            style = bodyType(OctoType.bodySmall),
             color = when (look) {
                 OutsideLook.Failed -> OctoColors.TextPrimary
                 OutsideLook.Found -> OctoColors.TextMuted
@@ -602,7 +603,7 @@ private fun AddHintLine(onSeen: () -> Unit) {
     LaunchedEffect(Unit) { onSeen() }
     Text(
         "Tap + to add a song to your library.",
-        style = OctoType.caption,
+        style = bodyType(OctoType.caption),
         color = OctoColors.TextMuted,
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 2.dp),
     )
@@ -612,7 +613,7 @@ private fun AddHintLine(onSeen: () -> Unit) {
 private fun Hint(text: String) {
     Text(
         text,
-        style = OctoType.bodySmall,
+        style = bodyType(OctoType.bodySmall),
         color = OctoColors.TextMuted,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
     )
@@ -660,7 +661,7 @@ private fun LazyListScope.rankedSection(
         item(key = "$key:about") {
             Text(
                 about,
-                style = OctoType.caption,
+                style = bodyType(OctoType.caption),
                 color = OctoColors.TextMuted,
                 modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
             )

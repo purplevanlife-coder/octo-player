@@ -1,5 +1,6 @@
 package app.winters.octo.ui.library
 
+import app.winters.octo.design.bodyType
 import app.winters.octo.ui.common.sortItem
 import app.winters.octo.ui.common.playShuffleItems
 import app.winters.octo.ui.common.LineItem
@@ -206,8 +207,8 @@ private fun SectionRow(section: Section, detail: String? = null, onClick: () -> 
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Icon(painterResource(section.icon), contentDescription = null, tint = OctoColors.Accent, modifier = Modifier.size(24.dp))
-        Text(section.label, style = OctoType.body, color = OctoColors.TextPrimary, modifier = Modifier.weight(1f))
-        detail?.let { Text(it, style = OctoType.caption, color = OctoColors.TextMuted) }
+        Text(section.label, style = bodyType(OctoType.body), color = OctoColors.TextPrimary, modifier = Modifier.weight(1f))
+        detail?.let { Text(it, style = bodyType(OctoType.caption), color = OctoColors.TextMuted) }
         Icon(painterResource(OctoIcons.Chevron), contentDescription = null, tint = OctoColors.TextMuted, modifier = Modifier.size(22.dp))
     }
 }

@@ -15,15 +15,18 @@ import androidx.compose.ui.unit.dp
 // The standard panel for a card on the page. No blur: the page behind it
 // is a flat colour, and blurring a flat colour changes nothing. On a light
 // theme the card is solid, or the shadows under it show through and gray it.
+// A theme with a glass recipe of its own (ThemeGlass) casts its shadow and
+// draws its hairline round the card; the card itself stays solid.
 @Composable
 fun Modifier.glassPanel(shape: Shape): Modifier = this
     // A dark half-pixel just outside the edge separates it from the page.
     .dropShadow(shape, Shadow(radius = 0.dp, spread = 0.5.dp, color = shadowColor(0.40f)))
-    .elevation1(shape)
+    .panelShadow(shape)
     .clip(shape)
     .background(if (LocalOctoSurfaces.current.light) OctoColors.BackgroundTertiary else OctoColors.BackgroundSecondary)
     // Light along the top edge only.
     .innerShadow(shape, Shadow(radius = 0.dp, color = glassRim(0.08f), offset = DpOffset(0.dp, 1.dp)))
+    .themeEdge(shape)
 
 // A panel that holds rows to read and change, as settings do: a solid
 // surface a clear step up from the page, with a faint rim, so each group
@@ -31,11 +34,26 @@ fun Modifier.glassPanel(shape: Shape): Modifier = this
 @Composable
 fun Modifier.raisedPanel(shape: Shape): Modifier = this
     .dropShadow(shape, Shadow(radius = 0.dp, spread = 0.5.dp, color = shadowColor(0.40f)))
-    .elevation1(shape)
+    .panelShadow(shape)
     .clip(shape)
     .background(OctoColors.SurfaceRaised)
-    .border(1.dp, glassRim(0.06f), shape)
+    .border(1.dp, ThemeGlass.edge ?: glassRim(0.06f), shape)
     .innerShadow(shape, Shadow(radius = 0.dp, color = glassRim(0.06f), offset = DpOffset(0.dp, 1.dp)))
+
+// A panel's shadow: the theme's glass shadow where it has one, otherwise
+// the lowest rung of the ladder.
+@Composable
+private fun Modifier.panelShadow(shape: Shape): Modifier {
+    val drop = ThemeGlass.drop ?: return elevation1(shape)
+    return dropShadow(shape, Shadow(radius = shadowBlur(drop.blur), color = drop.color, offset = DpOffset(0.dp, drop.y.dp)))
+}
+
+// The theme's glass hairline round a shape, where its glass has one.
+@Composable
+private fun Modifier.themeEdge(shape: Shape): Modifier {
+    val edge = ThemeGlass.edge ?: return this
+    return border(1.dp, edge, shape)
+}
 
 // The lowest rung of the shadow ladder: a tight contact shadow, then a
 // softer one.

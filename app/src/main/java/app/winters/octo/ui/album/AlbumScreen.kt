@@ -1,5 +1,6 @@
 package app.winters.octo.ui.album
 
+import app.winters.octo.design.displayType
 import app.winters.octo.ui.common.factsLine
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -820,7 +821,7 @@ fun AlbumHeader(
                 if (loop != null) Box(Modifier.size(CoverSide).artworkRim(CoverShape))
             }
             Spacer(Modifier.height(20.dp))
-            Text(title, style = OctoType.title, color = OctoColors.TextPrimary, textAlign = TextAlign.Center)
+            Text(title, style = displayType(OctoType.title), color = OctoColors.TextPrimary, textAlign = TextAlign.Center)
             AlbumByline(artist, details, onArtist, Modifier.padding(top = 4.dp))
         }
         HeaderControlLine(

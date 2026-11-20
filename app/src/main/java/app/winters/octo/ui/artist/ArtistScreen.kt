@@ -1,5 +1,6 @@
 package app.winters.octo.ui.artist
 
+import app.winters.octo.design.displayType
 import app.winters.octo.ui.common.factsLine
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -524,7 +525,7 @@ fun ArtistHeader(
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Artwork(artwork, 160.dp, shape = CircleShape)
             Spacer(Modifier.height(16.dp))
-            Text(name, style = OctoType.title, color = OctoColors.TextPrimary, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 20.dp))
+            Text(name, style = displayType(OctoType.title), color = OctoColors.TextPrimary, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 20.dp))
             Text(
                 details,
                 style = OctoType.bodySmall,

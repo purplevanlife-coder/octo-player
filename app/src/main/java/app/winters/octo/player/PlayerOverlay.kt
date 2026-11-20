@@ -104,6 +104,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
+import app.winters.octo.design.bodyType
 import app.winters.octo.theme.BarWish
 import app.winters.octo.theme.LocalBarRequest
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -867,9 +868,12 @@ private fun TitleRow(now: NowPlaying, model: PlayerViewModel, onClose: () -> Uni
         val liveModel: LivePlayerViewModel? = if (live != null) hiltViewModel() else null
         val calm = model.prefs.collectAsStateWithLifecycle().value.reduceMotion || rememberSystemReduceMotion()
         // The buttons sit on the middle of the name's capitals, the same for a
-        // song and a station, their icons sized from those capitals.
-        val capHeight = rememberCapHeightPx(TitleStyle)
-        val titleBaseline = rememberBaselinePx(TitleStyle)
+        // song and a station, their icons sized from those capitals. Measured
+        // in the face the title is drawn in (SongTitle sets it in the theme's
+        // body face, where the theme names one).
+        val drawnTitle = bodyType(TitleStyle)
+        val capHeight = rememberCapHeightPx(drawnTitle)
+        val titleBaseline = rememberBaselinePx(drawnTitle)
         val density = LocalDensity.current
         val icons = remember(capHeight, density) { TitleIcons(with(density) { capHeight.toDp() }) }
         CompositionLocalProvider(LocalTitleIcons provides icons) {
@@ -1067,7 +1071,7 @@ private fun TitleBlock(now: NowPlaying, calm: Boolean, onOpenArtist: (String) ->
             Text(
                 // While a play starts, the words say so in the artist's place.
                 song.starting ?: song.artist.orEmpty(),
-                style = OctoType.body,
+                style = bodyType(OctoType.body),
                 // The title's white a step back, which reads at 4.5:1 or
                 // better on the player's colors, where the accent ink did not.
                 color = LocalContentColor.current.copy(alpha = ArtistLineAlpha),

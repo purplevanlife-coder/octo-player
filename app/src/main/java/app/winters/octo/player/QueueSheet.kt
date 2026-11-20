@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.layout.FirstBaseline
 import app.winters.octo.design.Spinner
+import app.winters.octo.design.bodyType
 import kotlin.math.roundToInt
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -515,9 +516,9 @@ private fun SongLine(entry: QueueEntry, modifier: Modifier = Modifier, handle: M
         Artwork(entry.artwork, 44.dp, shape = RoundedCornerShape(6.dp), outside = isOutsideLibrary(entry.trackId))
         Column(Modifier.weight(1f)) {
             SongTitle(entry.title, explicit = entry.explicit, style = OctoType.bodySmall, color = OctoColors.TextPrimary)
-            Text(entry.artist, style = OctoType.caption, color = OctoColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(entry.artist, style = bodyType(OctoType.caption), color = OctoColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (entry.autoplay) Text("Autoplay", style = OctoType.caption, color = OctoColors.TextMuted)
+        if (entry.autoplay) Text("Autoplay", style = bodyType(OctoType.caption), color = OctoColors.TextMuted)
         if (handle != null) DragHandle(handle)
     }
 }

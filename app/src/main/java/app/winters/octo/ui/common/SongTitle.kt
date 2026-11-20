@@ -12,6 +12,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import app.winters.octo.design.ExplicitMark
 import app.winters.octo.design.ExplicitMarkGap
 import app.winters.octo.design.OctoColors
+import app.winters.octo.design.bodyType
 
 // A song's title on one line, with the "E" after it when the song is marked
 // explicit. A long title is cut short before the mark, so the mark always
@@ -30,7 +31,7 @@ fun SongTitle(
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         leading?.invoke()
-        Text(title, style = style, color = color, maxLines = 1, overflow = overflow, modifier = Modifier.weight(1f, fill = false).then(titleModifier))
+        Text(title, style = bodyType(style), color = color, maxLines = 1, overflow = overflow, modifier = Modifier.weight(1f, fill = false).then(titleModifier))
         if (explicit) ExplicitMark(Modifier.padding(start = ExplicitMarkGap), markColor)
     }
 }

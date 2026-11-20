@@ -62,6 +62,7 @@ import app.winters.octo.design.OctoType
 import app.winters.octo.design.OverArt
 import app.winters.octo.design.SelectedFill
 import app.winters.octo.design.SelectedRow
+import app.winters.octo.design.bodyType
 import app.winters.octo.design.rememberPressSqueeze
 import app.winters.octo.discovery.OnlineAlbum
 import app.winters.octo.discovery.OnlineArtist
@@ -149,14 +150,14 @@ private fun AlbumCard(
         Spacer(Modifier.height(8.dp))
         Text(
             title,
-            style = OctoType.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+            style = bodyType(OctoType.bodySmall.copy(fontWeight = FontWeight.SemiBold)),
             color = OctoColors.TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             artist,
-            style = OctoType.caption,
+            style = bodyType(OctoType.caption),
             color = OctoColors.TextMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -164,7 +165,7 @@ private fun AlbumCard(
         if (note != null) {
             Text(
                 note,
-                style = OctoType.caption,
+                style = bodyType(OctoType.caption),
                 color = OctoColors.TextMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -198,7 +199,7 @@ fun SongCard(track: TrackEntity, onClick: () -> Unit, menuContext: SongMenuConte
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 track.artist,
-                style = OctoType.caption,
+                style = bodyType(OctoType.caption),
                 color = OctoColors.TextMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -490,7 +491,7 @@ private fun SongFace(
                 },
             )
             if (!subtitle.isNullOrEmpty()) {
-                Text(subtitle, style = OctoType.caption, color = OctoColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = bodyType(OctoType.caption), color = OctoColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -572,8 +573,8 @@ private fun ArtistRow(artwork: String?, name: String, albumCount: Int?, onClick:
     ) {
         Artwork(artwork, 48.dp, shape = CircleShape, outside = outside)
         Column(Modifier.weight(1f)) {
-            Text(name, style = OctoType.bodySmall, color = OctoColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (albumCount != null) Text(albums(albumCount), style = OctoType.caption, color = OctoColors.TextMuted)
+            Text(name, style = bodyType(OctoType.bodySmall), color = OctoColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (albumCount != null) Text(albums(albumCount), style = bodyType(OctoType.caption), color = OctoColors.TextMuted)
         }
     }
 }
@@ -603,7 +604,7 @@ private fun ArtistCircle(artwork: String?, name: String, onClick: () -> Unit, on
         Spacer(Modifier.height(8.dp))
         Text(
             name,
-            style = OctoType.caption,
+            style = bodyType(OctoType.caption),
             color = OctoColors.TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
