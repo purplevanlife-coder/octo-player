@@ -1,0 +1,10 @@
+<!-- Phosphor Icons 2.1.1, compass (fill), MIT. Written by hand in the make_icons.py format; regenerate with tools/icons/make_icons.py. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M128,24A104,104,0,1,0,232,128A104.11,104.11,0,0,0,128,24ZM179.58,81.79L147.58,145.79A4.08,4.08,0,0,1,145.79,147.58L81.79,179.58A4,4,0,0,1,76.42,174.21L108.42,110.21A4.08,4.08,0,0,1,110.21,108.42L174.21,76.42A4,4,0,0,1,179.58,81.79Z"/>
+</vector>

@@ -85,14 +85,22 @@ import kotlin.math.abs
 // A tab: its icon, the filled icon it shows while selected, and its name.
 private class Tab(@DrawableRes val icon: Int, @DrawableRes val selectedIcon: Int, @StringRes val label: Int)
 
+// In TabOrder's order.
 private val tabs = listOf(
     Tab(OctoIcons.Home, OctoIcons.HomeSelected, R.string.tab_home),
+    Tab(OctoIcons.Discover, OctoIcons.DiscoverSelected, R.string.tab_discover),
     Tab(OctoIcons.Search, OctoIcons.SearchSelected, R.string.tab_search),
     Tab(OctoIcons.Library, OctoIcons.LibrarySelected, R.string.tab_library),
     Tab(OctoIcons.Settings, OctoIcons.SettingsSelected, R.string.tab_settings),
 )
 
 val BarHeight = 56.dp
+
+// The selected tab's pill: 62dp, but never wider than a tab's column, so
+// with five tabs on a narrow phone it stays inside its own tab (and inside
+// the bar at either end) instead of spilling under its neighbours' icons.
+// At 5 tabs a 412dp-wide Pixel gives columns of about 59dp.
+internal fun tabCapsuleWidth(column: Dp): Dp = minOf(62.dp, column)
 
 // The space between the bar and the bottom of the screen.
 val BarBottomGap = 14.dp
@@ -227,7 +235,7 @@ private fun TabBar(
         film = film,
     ) {
         val column = (fullWidth - 12.dp) / tabs.size
-        val capsuleWidth = 62.dp
+        val capsuleWidth = tabCapsuleWidth(column)
         val capsuleX by animateDpAsState(
             targetValue = 6.dp + column * selected + (column - capsuleWidth) / 2,
             animationSpec = spring(dampingRatio = 0.8f, stiffness = 350f),

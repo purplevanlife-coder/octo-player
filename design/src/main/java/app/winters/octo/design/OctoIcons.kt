@@ -124,6 +124,8 @@ object OctoIcons {
     // and Library share their icons with the rest of the app.
     val Home = R.drawable.sym_home
     val HomeSelected = R.drawable.sym_home_filled
+    val Discover = R.drawable.sym_discover
+    val DiscoverSelected = R.drawable.sym_discover_filled
     val SearchSelected = R.drawable.sym_search_filled
     val LibrarySelected = R.drawable.sym_library_filled
     val Settings = R.drawable.sym_settings

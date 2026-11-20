@@ -7,6 +7,9 @@ import app.winters.octo.query.LibraryQuery
 import kotlinx.serialization.Serializable
 
 @Serializable data object HomeRoute : NavKey
+
+// New music picked from what is played: the Discover tab.
+@Serializable data object DiscoverRoute : NavKey
 @Serializable data object SearchRoute : NavKey
 @Serializable data object LibraryRoute : NavKey
 @Serializable data object SettingsRoute : NavKey

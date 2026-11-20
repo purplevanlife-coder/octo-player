@@ -80,6 +80,8 @@
     "sym_headphones": { "icon": "headphones", "weight": "regular" },
     "sym_home": { "icon": "house", "weight": "regular" },
     "sym_home_filled": { "icon": "house", "weight": "fill" },
+    "sym_discover": { "icon": "compass", "weight": "regular" },
+    "sym_discover_filled": { "icon": "compass", "weight": "fill" },
     "sym_settings": { "icon": "gear", "weight": "regular" },
     "sym_settings_filled": { "icon": "gear", "weight": "fill" },
     "sym_library_filled": { "icon": "cards", "weight": "fill" },

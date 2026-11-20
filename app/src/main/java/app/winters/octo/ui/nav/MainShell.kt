@@ -150,14 +150,20 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
     val haze = rememberHazeState()
     // What the full player frosts, for the menus that open over it.
     val playerHaze = rememberHazeState()
-    // Called once each, always in this order.
+    // Called once each, always in this order (TabOrder's).
     val stacks = listOf(
         rememberNavBackStack(HomeRoute),
+        rememberNavBackStack(DiscoverRoute),
         rememberNavBackStack(SearchRoute),
         rememberNavBackStack(LibraryRoute),
         rememberNavBackStack(SettingsRoute),
     )
-    var selected by rememberSaveable { mutableIntStateOf(0) }
+    // Discover's kept batch is read from disk now, so its tab paints it on
+    // its first frame whenever it is opened.
+    hiltViewModel<app.winters.octo.ui.discover.DiscoverShellViewModel>()
+    var selected by rememberSaveable { mutableIntStateOf(TabOrder.HOME) }
+    // A tab saved by a build with fewer tabs can never point past the end.
+    if (selected !in stacks.indices) selected = TabOrder.HOME
     val stack = stacks[selected]
     // Whether this change of page is a change of tab, which moves
     // differently from going deeper or back.
@@ -248,7 +254,7 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
         searchSeen[0] = searchAsked
         playerOpen = false
         barPlayer = false
-        val searchTab = 1
+        val searchTab = TabOrder.SEARCH
         selected = searchTab
         val tab = stacks[searchTab]
         while (tab.size > 1) tab.removeAt(tab.lastIndex)
@@ -355,7 +361,7 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
                     StatusGlaze(haze, Modifier.align(Alignment.TopCenter))
                 }
                 // Back from the top of another tab goes Home rather than out.
-                BackHandler(enabled = selected != 0 && stack.size == 1) { selected = 0 }
+                BackHandler(enabled = selected != TabOrder.HOME && stack.size == 1) { selected = TabOrder.HOME }
 
                 // The bar steps aside while the full player is open; the artwork
                 // flies between the two.
@@ -452,6 +458,7 @@ private fun pagesFor(stack: NavBackStack<NavKey>): (NavKey) -> NavEntry<NavKey> 
     val back: () -> Unit = { stack.backOne() }
     return entryProvider {
         entry<HomeRoute> { HomeScreen(open) }
+        entry<DiscoverRoute> { app.winters.octo.ui.discover.DiscoverScreen(open) }
         entry<SearchRoute> { SearchScreen(open) }
         entry<LibraryRoute> { LibraryScreen(open) }
         entry<SettingsRoute> { SettingsScreen(open) }
