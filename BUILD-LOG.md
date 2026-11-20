@@ -52,10 +52,48 @@ Started: 2026-11-19 (America/Los_Angeles).
 | Run id | Branch | Commit | Result | Notes |
 |---|---|---|---|---|
 | 44644606689 | main | (stock) | success | Pre-fork-work baseline, 2026-11-19; APK verified, package app.winters.octo.debug |
+| 44668189551 | feature/discover-v1 | prep (51cedd31 remote) | **failure** | New unit-test step caught a real break: all 14 failures were `PlayerUpdaterTest` — its pretend GitHub only served `/repos/winters27/octo/releases`, but the updater now reads the fork repo. 1,403 other tests passed. Fixed in commit 09aadcb4 (test serves the fork path). |
+
+## Notes
+
+- **Push route:** plain `git push` has no credential path on this VM. Commits are
+  mirrored to GitHub through the Git Data API (api.github.com) with a script that
+  recreates each local commit on the remote (blobs → tree on parent tree → commit →
+  ref). Remote SHAs therefore differ from local SHAs; trees match. Remote branch tip
+  after prep: 51cedd31.
+- **Crew change (2026-11-19, per Collin):** Codex was pulled off the Octo fork for
+  another project (and its model sign-in failed there too), so Claude Code builds
+  solo and the coordinator does diff review directly.
 
 ## APK deliveries
 
 - Stock baseline: `~/workspace/your_files/octo-player-debug/app-debug.apk` (from run 44644606689).
+
+### Phase 1 — Discover v1 implemented (2026-11-19, Claude Code session, ~25 min)
+
+8 commits on top of prep (24bf47d5…0abcc83c). Full write-up: `DISCOVER-BUILD-NOTES.md`.
+
+- **Tab:** Discover at index 1 via a new `TabOrder` object (HOME 0, DISCOVER 1, SEARCH 2,
+  LIBRARY 3, SETTINGS 4); `searchTab` and all positional uses now read from it; a guard
+  keeps a saved 4-tab index in range. Bottom-bar pill capped at the column width (~59dp
+  on a 412dp Pixel) so 5 tabs fit; glide animation unchanged.
+- **Engine:** pure-Kotlin `DiscoverEngine` — seed weighting (play totals > recent plays >
+  favourite artists > liked / 4–5★ songs, log-scaled, top 8 seeds), similar-artist chains
+  2 hops via getArtistInfo2 (non-library first, seeds/dismissed excluded), genre lanes by
+  whole-word genre match + era-based Oldies, section building, dismissal filtering.
+- **Sections:** For You → Artists to explore → 14 lanes (Country…Reggae) → Made for you →
+  Stations → Charts; each only when it has content; one failing source drops only its section.
+- **Cache:** separate Room DB `discover.db` (batch + sections per server+account, 6h
+  freshness; empty batch never replaces a good one; kept batch is read at app start so the
+  tab's first frame has content). Artist extras (bio/top songs/similar) now persisted too,
+  3-day freshness, 60-day prune. Artwork prefetched through the shared Coil disk cache.
+- **Dismissals:** "Not interested" in the song long-press menu (Discover contexts only) and
+  on artist cards, with Undo; persisted per server+account and filtered from all batches.
+- **Tests:** 9 new test files (seed weights, chains, lanes, sections, dismissals, tab order,
+  menu item, UI state) in `:app:testDebugUnitTest`.
+- Deliberately out of v1: AI-music filter (no Subsonic signal), per-lane pages, dismissal
+  review list, Settings toggle for the tab, WorkManager refresh, backup/restore of
+  Discover data (separate DB — dismissals are NOT backed up; open question for Collin).
 
 ## Blockers / where work stopped
 
