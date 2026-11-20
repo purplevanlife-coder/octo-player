@@ -40,7 +40,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.changedToUpOrCanceled
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -270,7 +269,10 @@ fun NowPlayingBubble(
                             }
                             val change = event.changes.firstOrNull { it.id == down.id } ?: continue
                             lastMs = change.uptimeMillis
-                            if (change.changedToUpOrCanceled()) {
+                            // A change that is no longer pressed is the
+                            // release (or the touch taken away): either
+                            // way the machine settles the gesture.
+                            if (!change.pressed) {
                                 handle(machine.up(change.uptimeMillis))
                                 done = true
                             } else {
