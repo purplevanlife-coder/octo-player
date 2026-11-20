@@ -54,6 +54,11 @@ interface CatalogDao {
     @Query("SELECT * FROM track WHERE id IN (:ids)")
     suspend fun tracksByIdsUnordered(ids: List<String>): List<TrackEntity>
 
+    // Songs rated at least `min` stars, the best first, at most `limit`:
+    // one of Discover's listening signals. Read on the rating index.
+    @Query("SELECT * FROM track WHERE rating >= :min ORDER BY rating DESC, id LIMIT :limit")
+    suspend fun topRatedTracks(min: Int, limit: Int): List<TrackEntity>
+
     @Query("SELECT id FROM track WHERE albumId = :albumId ORDER BY albumOrder")
     suspend fun albumTrackIds(albumId: String): List<String>
 

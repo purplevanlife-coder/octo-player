@@ -6,6 +6,7 @@ import app.winters.octo.ui.nav.AlbumsRoute
 import app.winters.octo.ui.nav.ArtistRoute
 import app.winters.octo.ui.nav.ArtistsRoute
 import app.winters.octo.ui.nav.ChartsRoute
+import app.winters.octo.ui.nav.DiscoverRoute
 import app.winters.octo.ui.nav.DownloadsRoute
 import app.winters.octo.ui.nav.FamilyJoinRoute
 import app.winters.octo.ui.nav.FamilyRoute
@@ -51,7 +52,8 @@ sealed interface AmbientSource {
 // pages are library pages wherever they were opened from. A page not listed
 // here gets no glow, so a new page is plain until it is given an area.
 fun areaOf(route: NavKey?): AmbientArea? = when (route) {
-    HomeRoute, ChartsRoute, is ServerListRoute -> AmbientArea.Home
+    // Discover glows as Home does: it is the same kind of shelf page.
+    HomeRoute, DiscoverRoute, ChartsRoute, is ServerListRoute -> AmbientArea.Home
     SearchRoute -> AmbientArea.Search
     LibraryRoute, AlbumsRoute, ArtistsRoute, SongsRoute, GenresRoute, FoldersRoute,
     PlaylistsRoute, LikedRoute, DownloadsRoute, is FavouritesRoute,
