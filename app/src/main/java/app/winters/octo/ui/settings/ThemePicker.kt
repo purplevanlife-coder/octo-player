@@ -20,7 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -52,6 +55,10 @@ private const val CARDS_PER_ROW = 3
 
 private val CardShape = RoundedCornerShape(12.dp)
 private val MiniPageHeight = 56.dp
+
+// How far a theme's name may shrink to be drawn whole, and by how much a step.
+private const val MIN_NAME_SCALE = 0.6f
+private const val NAME_SCALE_STEP = 0.1f
 
 // Appearance's theme card: a small page for each theme, three to a row, the
 // one showing ringed in the accent with its name on an accent strip and a
@@ -175,12 +182,20 @@ private fun ThemeCard(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (selected) CheckMark(OctoColors.OnAccent, Modifier.size(14.dp))
+            // A name that does not fit whole in two lines (a two-word name
+            // beside the check at a large text size) steps down until it
+            // does; a name that fits keeps its size.
+            var nameScale by remember(theme, selected, LocalDensity.current.fontScale) { mutableFloatStateOf(1f) }
+            val nameStyle = OctoType.caption.copy(fontWeight = FontWeight.SemiBold)
             Text(
                 theme.label,
-                style = OctoType.caption.copy(fontWeight = FontWeight.SemiBold),
+                style = if (nameScale == 1f) nameStyle else nameStyle.copy(fontSize = nameStyle.fontSize * nameScale),
                 color = if (selected) OctoColors.OnAccent else OctoColors.TextPrimary,
                 maxLines = 2,
-                onTextLayout = { onNameLayout(theme, it) },
+                onTextLayout = {
+                    if ((it.didOverflowHeight || it.didOverflowWidth) && nameScale > MIN_NAME_SCALE) nameScale -= NAME_SCALE_STEP
+                    onNameLayout(theme, it)
+                },
                 modifier = Modifier.weight(1f),
             )
         }

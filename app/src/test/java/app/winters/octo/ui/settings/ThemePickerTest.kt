@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.sp
 import androidx.test.core.app.ApplicationProvider
 import app.winters.octo.design.ProvideOctoTheme
 import app.winters.octo.theme.AccentChoice
@@ -67,4 +68,19 @@ class ThemePickerTest {
 
     @Test
     fun everyNameIsFullyDrawnAtTwiceTheTextSize() = assertEveryNameFullyDrawn(2.0f)
+
+    // Only a name that would not fit steps down: the first five themes'
+    // names, which always fitted, keep the caption's size at both scales.
+    @Test
+    fun theNamesThatFitKeepTheirSize() {
+        val originals = ThemeChoice.entries.filter { it != ThemeChoice.MusicSpace }
+        for (fontScale in listOf(1.0f, 2.0f)) {
+            for (showing in ThemeChoice.entries) {
+                val names = laidOut(fontScale, showing)
+                for (theme in originals) {
+                    assertEquals("${theme.label} at $fontScale showing ${showing.label}", 12.sp, names.getValue(theme).layoutInput.style.fontSize)
+                }
+            }
+        }
+    }
 }
