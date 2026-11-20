@@ -28,13 +28,15 @@ class BarShownTest {
     private val shell = File(System.getProperty("octo.mainSources"), "app/winters/octo/ui/nav/MainShell.kt").readText().replace("\r\n", "\n")
 
     // Red when a page that draws the sign-in screen is missing from the set
-    // (its bar would show over it), a bar site stops reading the rule, or a
+    // (its bar would show over it), a bar site (the bar, the downloads pill,
+    // the bubble) stops reading the rule, or a
     // sign-in page pushed under the full player stays under it.
     @Test
     fun everySignInPageIsInTheSetAndBothSitesReadIt() {
         val drawn = Regex("""entry<(\w+)> \{[^\n]*SignInScreen\(""").findAll(shell).map { it.groupValues[1] }.toSet()
         assertEquals(signInRoutes.keys, drawn)
-        assertEquals(2, Regex(Regex.escape("visible = barShown(playerOpen, stack.lastOrNull()),")).findAll(shell).count())
+        // The bar, the downloads pill and Music Space's now-playing bubble.
+        assertEquals(3, Regex(Regex.escape("visible = barShown(playerOpen, stack.lastOrNull()),")).findAll(shell).count())
         assertFalse(shell.contains("visible = !playerOpen,"))
         assertTrue(shell.contains("LaunchedEffect(top) { if (isSignInRoute(top)) playerOpen = false }"))
     }

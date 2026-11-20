@@ -59,6 +59,12 @@ interface CatalogDao {
     @Query("SELECT * FROM track WHERE rating >= :min ORDER BY rating DESC, id LIMIT :limit")
     suspend fun topRatedTracks(min: Int, limit: Int): List<TrackEntity>
 
+    // At most `limit` of one artist's songs, album by album: Discover's
+    // "Heavy rotation, rediscovered" pool. Bounded, and read on the
+    // artist's songs index.
+    @Query("SELECT * FROM track WHERE artistId = :artistId ORDER BY albumId, albumOrder, id LIMIT :limit")
+    suspend fun artistSongsLimited(artistId: String, limit: Int): List<TrackEntity>
+
     @Query("SELECT id FROM track WHERE albumId = :albumId ORDER BY albumOrder")
     suspend fun albumTrackIds(albumId: String): List<String>
 

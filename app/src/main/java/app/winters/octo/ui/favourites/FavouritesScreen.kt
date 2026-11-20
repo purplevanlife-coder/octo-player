@@ -1,5 +1,6 @@
 package app.winters.octo.ui.favourites
 
+import app.winters.octo.ui.common.topBarRoom
 import app.winters.octo.ui.common.sortItem
 import app.winters.octo.ui.common.CopyNote
 import app.winters.octo.ui.common.playShuffleItems
@@ -226,7 +227,7 @@ fun FavouritesScreen(
     val segment = chosen
 
     Refreshable {
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp)) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp + topBarRoom())) {
             val keep = keepLikedItem()
             PageHeader(
                 "Favorites",

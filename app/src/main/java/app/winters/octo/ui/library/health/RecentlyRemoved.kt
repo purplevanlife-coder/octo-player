@@ -1,5 +1,6 @@
 package app.winters.octo.ui.library.health
 
+import app.winters.octo.ui.common.topBarRoom
 import app.winters.octo.ui.common.PageHeader
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -128,7 +129,7 @@ fun RecentlyRemovedScreen(onBack: () -> Unit, vm: RecentlyRemovedViewModel = hil
     val canRestore = actions?.canRestore == true
     val now = remember { System.currentTimeMillis() }
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp)) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp + topBarRoom())) {
             val trash = vm.trash
             val problem = vm.problem
             PageHeader(

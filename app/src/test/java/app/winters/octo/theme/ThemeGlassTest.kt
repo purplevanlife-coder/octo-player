@@ -18,7 +18,9 @@ import app.winters.octo.design.OctoGlass
 import app.winters.octo.design.OverArt
 import app.winters.octo.design.PlayerBarSurface
 import app.winters.octo.design.ThemeGlass
+import app.winters.octo.design.barHairlineY
 import app.winters.octo.design.barLookOf
+import app.winters.octo.design.barShadowY
 import app.winters.octo.design.glassFilm
 import app.winters.octo.design.glassFor
 import app.winters.octo.testing.RobolectricComposeRule
@@ -81,6 +83,18 @@ class ThemeGlassTest {
             val expected = if (theme == ThemeChoice.MusicSpace) BarLook.Surface else BarLook.Glaze
             assertEquals(theme.name, expected, barLookOf(glassFor(theme)))
         }
+    }
+
+    // Docked at the bottom the surface casts its shadow upward with the
+    // hairline on top, exactly as before; docked at the top (Music Space's
+    // shell) the shadow falls down onto the page and the hairline faces it.
+    @Test
+    fun theBarSurfaceFlipsItsShadowAndHairlineWhenDockedAtTheTop() {
+        val drop = glassFor(ThemeChoice.MusicSpace).playerBar!!.drop
+        assertEquals(-8f, barShadowY(drop, topDocked = false))
+        assertEquals(8f, barShadowY(drop, topDocked = true))
+        assertEquals(1f, barHairlineY(topDocked = false))
+        assertEquals(-1f, barHairlineY(topDocked = true))
     }
 
     // The glaze's film follows the theme: the five keep the dim GlazeTint has

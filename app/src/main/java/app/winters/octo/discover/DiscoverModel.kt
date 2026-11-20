@@ -46,6 +46,11 @@ enum class SectionKind {
 
     // The chart of the moment, as a row of song cards.
     Charts,
+
+    // One curated playlist (DiscoverPlaylists.kt): a named, themed list of
+    // songs, drawn as a tile that opens the list. Its key names its theme
+    // and the batch's generation ("pl:<theme>#g<n>").
+    Playlist,
 }
 
 // An artist Discover found: in the library when `libraryId` is set,
@@ -74,8 +79,11 @@ data class DiscoverSection(
     val isEmpty: Boolean get() = songs.isEmpty() && artists.isEmpty() && lists.isEmpty()
 }
 
-// A whole batch, and when it was made (wall-clock millis).
-data class DiscoverBatch(val sections: List<DiscoverSection>, val generatedAt: Long)
+// A whole batch, when it was made (wall-clock millis), and its generation:
+// how many times the listener asked for new picks (Refresh, or a pull).
+// A batch made again because it went stale keeps its generation; only a
+// refresh asked for makes the next one, with other playlists.
+data class DiscoverBatch(val sections: List<DiscoverSection>, val generatedAt: Long, val generation: Long = 0)
 
 // Picks turned down with "Not interested", for one server and account:
 // songs by id and by their title and artist (so the same song found again

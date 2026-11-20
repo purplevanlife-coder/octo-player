@@ -138,7 +138,10 @@ fun FeedbackHost(feedback: Feedback, modifier: Modifier = Modifier) {
         }
     }
     val current = last ?: return
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BarBottomGap + BarHeight + AboveBar
+    // Above the floating bar, or, with the bar docked at the top, just
+    // above the navigation bar.
+    val barRoom = if (topBarRoom() > 0.dp) 0.dp else BarHeight
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + BarBottomGap + barRoom + AboveBar
     Box(modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = bottom), contentAlignment = Alignment.BottomCenter) {
         FloatingGlaze(
             LocalHaze.current,

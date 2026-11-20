@@ -6,8 +6,10 @@ import app.winters.octo.catalog.ArtistEntity
 import app.winters.octo.catalog.ArtworkRef
 import app.winters.octo.catalog.CatalogDao
 import app.winters.octo.catalog.FavouritesDao
+import app.winters.octo.catalog.SongIdentity
 import app.winters.octo.catalog.TrackEntity
 import app.winters.octo.catalog.UserDao
+import app.winters.octo.catalog.searchKey
 import app.winters.octo.covers.AheadCoverBucket
 import app.winters.octo.data.Session
 import app.winters.octo.data.SessionRepository
@@ -21,6 +23,7 @@ import app.winters.octo.discovery.Discovery
 import app.winters.octo.discovery.Station
 import app.winters.octo.discovery.ownSongs
 import app.winters.octo.discovery.serverArtistIdOf
+import app.winters.octo.discovery.titleKeys
 import app.winters.octo.listening.PlayHistory
 import app.winters.octo.listening.TotalsAnswer
 import app.winters.octo.server.serverSourceId
@@ -56,11 +59,15 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
 // The format sections are written in; a batch of another is made anew.
-internal const val BATCH_FORMAT = 1
+// Format 1 (before the playlists) is still read and shown, as stale, so
+// the tab paints it while the first batch with playlists is made.
+internal const val BATCH_FORMAT = 2
+private const val SHOWN_FORMATS_FROM = 1
 
 // How many of the listener's signals are read: the most played songs, the
 // latest plays, liked songs and highly rated songs.
@@ -75,14 +82,29 @@ private const val SIGNALS_WAIT_MS = 20_000L
 
 // Similar songs read for the strongest seeds, and per chain artist: their
 // top songs and songs like them, for this many chain artists.
-private const val SEED_SONGS_FROM = 4
+private const val SEED_SONGS_FROM = 6
 private const val SEED_SIMILAR_SONGS = 15
-private const val CHAIN_SONGS_FROM = 10
+private const val CHAIN_SONGS_FROM = 12
 private const val CHAIN_TOP_SONGS = 5
 private const val CHAIN_SIMILAR_SONGS = 6
 
 // Songs like a chain artist count for this much of the artist's own top songs.
 private const val SIMILAR_SONG_SHARE = 0.6
+
+// How many artists are weighed before the seeds are chosen from them (the
+// strongest with a library id seed the chains), and how many of the
+// strongest artists known only from the listening history get a chain of
+// their own, through the server's artist of that name.
+private const val SEEDS_WEIGHED = 60
+private const val HISTORY_CHAINS = 3
+
+// The listening history's songs are looked up by title this many keys at a time.
+private const val KEYS_AT_ONCE = 400
+
+// "Heavy rotation, rediscovered": this many of the strongest seeds, at
+// most this many songs read from each.
+private const val REDISCOVER_ARTISTS = 6
+private const val REDISCOVER_READ = 40
 
 // Server calls in flight at once while a batch is made.
 private const val CALLS_AT_ONCE = 4
@@ -133,11 +155,16 @@ class DiscoverRepository @Inject constructor(
     private val extras: ArtistExtrasSource,
     private val discovery: Discovery,
     private val charts: ChartLists,
+    private val takeout: TakeoutSeedSource,
     @ApplicationContext private val context: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val json = Json { ignoreUnknownKeys = true }
     private val making = Mutex()
+
+    // A Refresh asked for while another batch was being made: the next
+    // generation is made as soon as that one is done.
+    private val refreshAsked = AtomicBoolean(false)
 
     // The server and account in use, or null with none signed in.
     val owner: StateFlow<String?> = sessions.state.map(::ownerOf).distinctUntilChanged()
@@ -168,13 +195,13 @@ class DiscoverRepository @Inject constructor(
                     return@collect
                 }
                 val kept = safely("read") { load(o) }
-                _batch.value = OwnedBatch(o, kept)
-                val due = kept == null || isStale(kept.generatedAt, System.currentTimeMillis())
+                _batch.value = OwnedBatch(o, kept?.batch)
+                val due = kept == null || kept.outdated || isStale(kept.batch.generatedAt, System.currentTimeMillis())
                 if (due) {
                     // Behind the app's start, or the switch, not in its way.
                     scope.launch {
                         delay(if (kept == null) FIRST_MAKE_DELAY_MS else STALE_MAKE_DELAY_MS)
-                        if (owner.value == o) make(o)
+                        if (owner.value == o) make(o, newGeneration = false)
                     }
                 }
             }
@@ -185,19 +212,22 @@ class DiscoverRepository @Inject constructor(
     // the shell so that happens at start.
     fun warm() = Unit
 
-    // The tab is on screen: a stale batch is made again behind it.
+    // The tab is on screen: a stale batch is made again behind it, in the
+    // same generation (new data, the same curation).
     fun refreshIfStale() {
         val o = owner.value ?: return
         val shown = _batch.value?.takeIf { it.owner == o } ?: return
         val at = shown.batch?.generatedAt
-        if (at == null || isStale(at, System.currentTimeMillis())) refresh()
+        if (at == null || isStale(at, System.currentTimeMillis())) scope.launch { make(o, newGeneration = false) }
     }
 
-    // A pull: a new batch is made in the background, the current one
-    // staying on screen until it lands. A pull while one is made does nothing.
+    // Refresh (the button, or a pull): the next generation is made in the
+    // background, with other playlists, the current batch staying on
+    // screen until it lands. Asked while a batch is being made, it is made
+    // right after that one.
     fun refresh() {
         val o = owner.value ?: return
-        scope.launch { make(o) }
+        scope.launch { make(o, newGeneration = true) }
     }
 
     fun dismissSong(track: TrackEntity) {
@@ -238,26 +268,52 @@ class DiscoverRepository @Inject constructor(
 
     // Makes a batch for `owner` and keeps it, unless one is being made, the
     // server changed meanwhile, or it came back empty over one that was not.
-    private suspend fun make(owner: String) {
-        if (!making.tryLock()) return
+    // `newGeneration` (a Refresh) makes the generation after the kept
+    // batch's; otherwise it keeps the kept batch's. A Refresh asked while
+    // one is made waits for it, then makes its own.
+    private suspend fun make(owner: String, newGeneration: Boolean) {
+        if (!making.tryLock()) {
+            if (newGeneration) refreshAsked.set(true)
+            return
+        }
         _making.value = true
         try {
-            val session = (sessions.state.value as? SessionState.SignedIn)?.session ?: return
-            if (ownerOf(session) != owner) return
-            val before = _batch.value?.takeIf { it.owner == owner }?.batch
-            val made = safely("make") { makeBatch(session, owner, before) } ?: return
-            if (this.owner.value != owner) return
-            if (made.sections.isEmpty() && before != null && before.sections.isNotEmpty()) return
-            safely("keep") { keep(owner, made) }
-            _batch.value = OwnedBatch(owner, made)
-            scope.launch { safely("covers") { coversAhead(made) } }
+            var next = newGeneration
+            do {
+                refreshAsked.set(false)
+                makeOne(owner, next)
+                next = true
+            } while (refreshAsked.get() && this.owner.value == owner)
         } finally {
             _making.value = false
             making.unlock()
         }
+        // Asked for between the last look and the unlock: made now.
+        if (refreshAsked.getAndSet(false) && this.owner.value == owner) scope.launch { make(owner, newGeneration = true) }
     }
 
-    private suspend fun makeBatch(session: Session, owner: String, before: DiscoverBatch?): DiscoverBatch = coroutineScope {
+    private suspend fun makeOne(owner: String, newGeneration: Boolean) {
+        val session = (sessions.state.value as? SessionState.SignedIn)?.session ?: return
+        if (ownerOf(session) != owner) return
+        val before = _batch.value?.takeIf { it.owner == owner }?.batch
+        val generation = before?.let { it.generation + if (newGeneration) 1 else 0 } ?: 0L
+        // Only a new generation has to differ from the batch it replaces.
+        val previous = if (newGeneration) before?.playlistThemes().orEmpty() else emptySet()
+        val made = safely("make") { makeBatch(session, owner, before, generation, previous) } ?: return
+        if (this.owner.value != owner) return
+        if (made.sections.isEmpty() && before != null && before.sections.isNotEmpty()) return
+        safely("keep") { keep(owner, made) }
+        _batch.value = OwnedBatch(owner, made)
+        scope.launch { safely("covers") { coversAhead(made) } }
+    }
+
+    private suspend fun makeBatch(
+        session: Session,
+        owner: String,
+        before: DiscoverBatch?,
+        generation: Long,
+        previous: Set<String>,
+    ): DiscoverBatch = coroutineScope {
         val client = session.client
         val sourceId = serverSourceId(client.primaryUrl)
         val dismissed = dismissedOf(dao.dismissedNow(owner))
@@ -275,19 +331,41 @@ class DiscoverRepository @Inject constructor(
             }
         }
 
-        val seeds = weighSeeds(signals())
-        val seedKeys = seeds.mapTo(HashSet()) { artistKey(it.artist.name) }
+        val takeoutSeed = takeout.seed
+        val read = signals(takeoutSeed)
+        val history = async { historySongs(takeoutSeed) }
+        // The strongest artists with a library id seed the chains; the
+        // strongest known only from the listening history get a chain
+        // through the server's artist of that name. Every one of the
+        // strongest, whatever it has, is a seed whose own songs are no find.
+        val weighed = weighSeeds(read.signals, SEEDS_WEIGHED)
+        val seeds = weighed.filter { it.artist.id.isNotEmpty() }.take(SEED_COUNT)
+        val historyKeys = takeoutSeed.artists.mapTo(HashSet()) { artistKey(it.name) }
+        val historyOnly = weighed.filter { it.artist.id.isEmpty() && artistKey(it.artist.name) in historyKeys }.take(HISTORY_CHAINS)
+        val seedKeys = (weighed.take(SEED_COUNT) + seeds + historyOnly).mapTo(HashSet()) { artistKey(it.artist.name) }
         val entities: List<ArtistEntity?> = seeds.map { seed ->
             async { seed.artist.id.takeIf(String::isNotEmpty)?.let { id -> safely("seed") { catalog.artist(id).first() } } }
         }.awaitAll()
 
         // First hop: artists like each seed.
-        val firstLinks = seeds.zip(entities).map { (seed, entity) ->
+        val libraryLinks = seeds.zip(entities).map { (seed, entity) ->
             async {
                 val similar = entity?.let { e -> call { extras.forArtist(e) }?.similar }.orEmpty()
                 ChainLink(similar, seed.weight, seed.artist.name)
             }
         }.awaitAll()
+        // The history's own artists: found on the server by name, and the
+        // artists like them there. One the server does not know gives nothing.
+        val historyFirst = historyOnly.map { seed ->
+            async {
+                val name = seed.artist.name
+                val serverId = call { client.search(name, artists = 5, albums = 0, songs = 0).artist }
+                    ?.firstOrNull { SongIdentity.sameArtistName(it.name, name) }?.id
+                val similar = serverId?.let { id -> call { extras.similarToServerArtist(id, name) } }.orEmpty()
+                Triple(seed, serverId, ChainLink(similar, seed.weight, name))
+            }
+        }.awaitAll()
+        val firstLinks = libraryLinks + historyFirst.map { it.third }
         // Second hop: artists like the best of those outside the library.
         val secondLinks = secondHopFrom(scoreChain(firstLinks), seedKeys, dismissed).map { c ->
             async {
@@ -297,25 +375,47 @@ class DiscoverRepository @Inject constructor(
         }.awaitAll()
         val chain = rankChain(scoreChain(firstLinks + secondLinks), seedKeys, dismissed)
 
-        // Songs: like the strongest seeds, and from the chain's artists.
-        val asks = ArrayList<kotlinx.coroutines.Deferred<List<Pair<Song, Double>>>>()
+        // Songs: like the strongest seeds, and from the chain's artists,
+        // each with the seed it came through.
+        val asks = ArrayList<kotlinx.coroutines.Deferred<List<Found>>>()
         seeds.zip(entities).take(SEED_SONGS_FROM).forEach { (seed, entity) ->
             val serverId = entity?.let { serverArtistIdOf(it.id, sourceId) } ?: return@forEach
-            asks += async { ranked(call { client.similarSongs(serverId, SEED_SIMILAR_SONGS) }, seed.weight) }
+            asks += async { ranked(call { client.similarSongs(serverId, SEED_SIMILAR_SONGS) }, seed.weight, seed.artist.name) }
+        }
+        historyFirst.forEach { (seed, serverId, _) ->
+            if (serverId != null) asks += async { ranked(call { client.similarSongs(serverId, SEED_SIMILAR_SONGS) }, seed.weight, seed.artist.name) }
         }
         chain.filter { !it.inLibrary }.take(CHAIN_SONGS_FROM).forEach { c ->
-            asks += async { ranked(call { client.topSongs(c.artist.name, CHAIN_TOP_SONGS) }?.let { ownSongs(it, c.artist.name) }, c.score) }
-            asks += async { ranked(call { client.similarSongs(c.artist.serverId, CHAIN_SIMILAR_SONGS) }, c.score * SIMILAR_SONG_SHARE) }
+            asks += async { ranked(call { client.topSongs(c.artist.name, CHAIN_TOP_SONGS) }?.let { ownSongs(it, c.artist.name) }, c.score, c.via) }
+            asks += async { ranked(call { client.similarSongs(c.artist.serverId, CHAIN_SIMILAR_SONGS) }, c.score * SIMILAR_SONG_SHARE, c.via) }
         }
         val found = asks.awaitAll().flatten()
-        val tracks: List<TrackEntity?> = if (found.isEmpty()) emptyList() else answerOf { discovery.resolveInPlace(found.map { it.first }) }.orEmpty()
+        val tracks: List<TrackEntity?> = if (found.isEmpty()) emptyList() else answerOf { discovery.resolveInPlace(found.map { it.song }) }.orEmpty()
         val picks = found.zip(tracks).mapNotNull { (sent, track) ->
-            track?.let { Pick(it, sent.first.genre?.takeIf(String::isNotBlank), sent.first.year?.takeIf { y -> y > 0 }, sent.second) }
+            track?.let { Pick(it, sent.song.genre?.takeIf(String::isNotBlank), sent.song.year?.takeIf { y -> y > 0 }, sent.weight, sent.via) }
         }
+
+        // The playlists: from the picks, the seeds, the history's songs in
+        // the library and the strongest seeds' other songs.
+        val historyTracks = history.await()
+        val rediscover = rediscoverSongs(seeds, read.mostPlayed + historyTracks.take(HISTORY_PLAYLIST_SIZE).map { it.id })
+        val playlists = buildPlaylists(
+            PlaylistInput(
+                picks = picks,
+                seeds = (seeds + historyOnly).sortedWith(compareByDescending<Seed> { it.weight }.thenBy { artistKey(it.artist.name) }).map { it.artist.name },
+                historySeeds = historyOnly.mapTo(HashSet()) { artistKey(it.artist.name) },
+                seedKeys = seedKeys,
+                dismissed = dismissed,
+                history = historyTracks,
+                rediscover = rediscover,
+            ),
+            generation,
+            previous,
+        )
 
         // A list that could not be read keeps what the last batch had.
         fun kept(kind: SectionKind): List<Station> = before?.sections?.firstOrNull { it.kind == kind }?.lists.orEmpty()
-        val sections = buildSections(
+        val sections = playlists + buildSections(
             SectionInput(
                 picks = picks,
                 artists = chain,
@@ -326,17 +426,43 @@ class DiscoverRepository @Inject constructor(
                 charts = chart.await() ?: before?.sections?.firstOrNull { it.kind == SectionKind.Charts }?.songs.orEmpty(),
             ),
         )
-        DiscoverBatch(sections, System.currentTimeMillis())
+        DiscoverBatch(sections, System.currentTimeMillis(), generation)
     }
+
+    // A song one list sent, with its weight and the seed it came through.
+    private class Found(val song: Song, val weight: Double, val via: String?)
 
     // Songs as one list sent them, each with its weight: `weight` for the
     // first, less for each one after.
-    private fun ranked(songs: List<Song>?, weight: Double): List<Pair<Song, Double>> =
-        songs.orEmpty().mapIndexed { i, song -> song to weight / (1.0 + RANK_DECAY * i) }
+    private fun ranked(songs: List<Song>?, weight: Double, via: String?): List<Found> =
+        songs.orEmpty().mapIndexed { i, song -> Found(song, weight / (1.0 + RANK_DECAY * i), via) }
 
-    // What the library says the listener plays and loves. A read that
-    // cannot be made (the play counts still building) gives nothing.
-    private suspend fun signals(): SeedSignals {
+    // The listening history's songs the library has, most played first.
+    private suspend fun historySongs(seed: TakeoutSeed): List<TrackEntity> {
+        if (seed.tracks.isEmpty()) return emptyList()
+        return safely("history songs") {
+            val keys = seed.tracks.flatMap { titleKeys(it.title) }.distinct()
+            matchTakeoutTracks(seed.tracks, keys.chunked(KEYS_AT_ONCE).flatMap { catalog.tracksWithKeys(it) })
+        }.orEmpty()
+    }
+
+    // The strongest seeds' other library songs (not among the most played,
+    // `played`), a bounded read of each, for "Heavy rotation, rediscovered".
+    private suspend fun rediscoverSongs(seeds: List<Seed>, played: Collection<String>): List<TrackEntity> {
+        val skip = played.toHashSet()
+        return seeds.take(REDISCOVER_ARTISTS).flatMap { seed ->
+            safely("rediscover") { catalog.artistSongsLimited(seed.artist.id, REDISCOVER_READ) }.orEmpty().filter { it.id !in skip }
+        }
+    }
+
+    // The listener's signals, and the ids of the most played songs.
+    private class Signals(val signals: SeedSignals, val mostPlayed: List<String>)
+
+    // What the library says the listener plays and loves, and what the
+    // listening history says they played before (its artists matched to the
+    // library's by name). A read that cannot be made (the play counts still
+    // building) gives nothing.
+    private suspend fun signals(seed: TakeoutSeed): Signals {
         fun ref(track: TrackEntity) = ArtistRef(track.artistId, track.artist)
         val played = safely("plays") {
             withTimeoutOrNull(SIGNALS_WAIT_MS) { (history.mostPlayed(null, PLAYED_READ).first() as? TotalsAnswer.Value)?.value }
@@ -345,20 +471,34 @@ class DiscoverRepository @Inject constructor(
         val likedArtists = safely("liked artists") { favourites.likedArtists().first() }.orEmpty()
         val likedSongs = safely("liked songs") { users.likedTracksLimited(LIKED_READ) }.orEmpty()
         val rated = safely("rated") { catalog.topRatedTracks(RATED_FROM, RATED_READ) }.orEmpty()
-        return SeedSignals(
+        val history = if (seed.artists.isEmpty()) {
+            emptyList()
+        } else {
+            val library = safely("history artists") {
+                seed.artists.map { searchKey(it.name) }.distinct().chunked(KEYS_AT_ONCE).flatMap { catalog.artistsWithKeys(it) }
+            }.orEmpty()
+            matchTakeoutArtists(seed.artists, library.map { ArtistRef(it.id, it.name) })
+        }
+        val signals = SeedSignals(
             plays = played.map { ref(it.track) to it.plays },
             recent = recent.map { ref(it.track) },
             likedArtists = likedArtists.map { ArtistRef(it.artist.id, it.artist.name) },
             likedSongs = likedSongs.map(::ref),
             rated = rated.map { ref(it) to it.rating },
+            history = history,
         )
+        return Signals(signals, played.map { it.track.id })
     }
 
+    // A batch as read from disk; `outdated` when it was written in an older
+    // format, to be made again behind it.
+    private class Kept(val batch: DiscoverBatch, val outdated: Boolean)
+
     // The batch kept for `owner`, or null when there is none (or it was
-    // written in another format).
-    private suspend fun load(owner: String): DiscoverBatch? {
+    // written in a format this build does not read).
+    private suspend fun load(owner: String): Kept? {
         val head = dao.batch(owner) ?: return null
-        if (head.format != BATCH_FORMAT) return null
+        if (head.format !in SHOWN_FORMATS_FROM..BATCH_FORMAT) return null
         val sections = dao.sections(owner).mapNotNull { row ->
             try {
                 json.decodeFromString(DiscoverSection.serializer(), row.payload)
@@ -366,14 +506,14 @@ class DiscoverRepository @Inject constructor(
                 null
             }
         }
-        return DiscoverBatch(sections, head.generatedAt)
+        return Kept(DiscoverBatch(sections, head.generatedAt, head.generation), outdated = head.format != BATCH_FORMAT)
     }
 
     private suspend fun keep(owner: String, batch: DiscoverBatch) {
         val rows = batch.sections.mapIndexed { i, s ->
             DiscoverSectionEntity(owner, i, s.key, s.kind.name, s.title, json.encodeToString(DiscoverSection.serializer(), s))
         }
-        dao.replaceBatch(DiscoverBatchEntity(owner, batch.generatedAt, BATCH_FORMAT), rows)
+        dao.replaceBatch(DiscoverBatchEntity(owner, batch.generatedAt, BATCH_FORMAT, batch.generation), rows)
     }
 
     // The batch's first covers, fetched into Coil's disk cache through the

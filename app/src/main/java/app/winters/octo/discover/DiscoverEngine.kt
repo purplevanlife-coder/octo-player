@@ -49,13 +49,17 @@ data class ArtistRef(val id: String, val name: String)
 // Everything that says which library artists are listened to. Each list
 // holds one entry per thing counted: `plays` an artist's total plays,
 // `recent` one per recent play, `likedArtists` one per favourite artist,
-// `likedSongs` one per liked song, `rated` one per rated song.
+// `likedSongs` one per liked song, `rated` one per rated song. `history`
+// holds the artists of the listening history bundled with the app
+// (TakeoutSeed), each with its plays there: the library's id when the
+// library has the artist (matchTakeoutArtists), else an empty id.
 data class SeedSignals(
     val plays: List<Pair<ArtistRef, Int>> = emptyList(),
     val recent: List<ArtistRef> = emptyList(),
     val likedArtists: List<ArtistRef> = emptyList(),
     val likedSongs: List<ArtistRef> = emptyList(),
     val rated: List<Pair<ArtistRef, Int>> = emptyList(),
+    val history: List<Pair<ArtistRef, Int>> = emptyList(),
 )
 
 data class Seed(val artist: ArtistRef, val weight: Double)
@@ -75,6 +79,13 @@ object SeedWeights {
     // Per star above three (four stars 0.5, five stars 1.0), at most RATED_MOST.
     const val RATED_STAR = 0.5
     const val RATED_MOST = 2.0
+
+    // The listening history's plays, on the same log as the in-app play
+    // totals and a little under them (they span years, not the app's
+    // months): its top artist (~3,900 plays) weighs ~24.8, as much as an
+    // artist played ~490 times in the app, and its 300th (32 plays) ~10.5,
+    // as much as ~13 in-app plays, still well above any like or rating.
+    const val HISTORY = 3.0
 }
 
 // Names that are no one in particular, never a seed or a pick.
@@ -87,7 +98,7 @@ fun songKey(title: String, artist: String): String = matchKey(artist) + "|" + ma
 
 fun songKey(track: TrackEntity): String = songKey(track.title, track.artist)
 
-private fun isSomeone(name: String): Boolean = name.trim().lowercase() !in NoOne && artistKey(name).isNotEmpty()
+internal fun isSomeone(name: String): Boolean = name.trim().lowercase() !in NoOne && artistKey(name).isNotEmpty()
 
 // The library artists that seed Discover, heaviest first (then by name, so
 // the order is steady), at most `limit`. Artists are one artist by name,
@@ -100,6 +111,7 @@ fun weighSeeds(signals: SeedSignals, limit: Int = SEED_COUNT): List<Seed> {
         var likedArtist = false
         var likedSongs = 0
         var ratedStars = 0.0
+        var history = 0
     }
     val tallies = LinkedHashMap<String, Tally>()
     fun tally(ref: ArtistRef): Tally? {
@@ -113,13 +125,15 @@ fun weighSeeds(signals: SeedSignals, limit: Int = SEED_COUNT): List<Seed> {
     signals.likedArtists.forEach { tally(it)?.likedArtist = true }
     signals.likedSongs.forEach { tally(it)?.let { t -> t.likedSongs++ } }
     signals.rated.forEach { (ref, rating) -> if (rating > 3) tally(ref)?.let { it.ratedStars += (rating - 3) * SeedWeights.RATED_STAR } }
+    signals.history.forEach { (ref, plays) -> if (plays > 0) tally(ref)?.let { it.history += plays } }
     return tallies.values
         .map { t ->
             val weight = SeedWeights.PLAYS * ln(1.0 + t.plays) +
                 SeedWeights.RECENT * ln(1.0 + t.recent) +
                 (if (t.likedArtist) SeedWeights.LIKED_ARTIST else 0.0) +
                 minOf(SeedWeights.LIKED_SONGS_MOST, t.likedSongs * SeedWeights.LIKED_SONG) +
-                minOf(SeedWeights.RATED_MOST, t.ratedStars)
+                minOf(SeedWeights.RATED_MOST, t.ratedStars) +
+                SeedWeights.HISTORY * ln(1.0 + t.history)
             Seed(t.ref, weight)
         }
         .filter { it.weight > 0 }
@@ -191,12 +205,15 @@ private val byScore = compareByDescending<ChainCandidate> { it.score }.thenBy { 
 
 // A song found for Discover: as the app shows it, with the genre and year
 // the server sent (a song found online keeps neither on its row), the
-// artist it is by, and how strongly the chains point at it.
+// artist it is by, how strongly the chains point at it, and the seed whose
+// chain led to it (`via`, the seed's name; null when not known), which the
+// "Because you play" playlists are made from.
 data class Pick(
     val track: TrackEntity,
     val genre: String?,
     val year: Int?,
     val score: Double,
+    val via: String? = null,
 ) {
     val artist: String get() = artistKey(track.artist)
     val outside: Boolean get() = isFind(track.id)

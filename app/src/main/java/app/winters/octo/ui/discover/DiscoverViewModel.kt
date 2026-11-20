@@ -12,6 +12,10 @@ import app.winters.octo.data.SessionState
 import app.winters.octo.discover.DiscoverArtist
 import app.winters.octo.discover.DiscoverBatch
 import app.winters.octo.discover.DiscoverRepository
+import app.winters.octo.discover.DiscoverSection
+import app.winters.octo.discover.SectionKind
+import app.winters.octo.discover.has
+import app.winters.octo.discover.themeOfKey
 import app.winters.octo.discover.Dismissed
 import app.winters.octo.discover.OwnedBatch
 import app.winters.octo.discover.without
@@ -57,6 +61,23 @@ sealed interface DiscoverUi {
     // A batch, with the picks turned down since it was made left out.
     data class Ready(val batch: DiscoverBatch, val making: Boolean) : DiscoverUi
 }
+
+// The playlist the detail page shows for `key`: the batch's own, as shown
+// (turned-down picks already out), or, once a new batch has landed without
+// it (another generation's keys) or its last song was turned down, the copy
+// last seen there, `last`, without what has been turned down since, so
+// the page never vanishes under the listener. Null with no page open, or
+// nothing to show for it.
+internal fun playlistShown(key: String?, shown: DiscoverBatch?, last: DiscoverSection?, dismissed: Dismissed): DiscoverSection? {
+    if (key == null) return null
+    shown?.sections?.firstOrNull { it.key == key && it.kind == SectionKind.Playlist }?.let { return it }
+    return last?.takeIf { it.key == key }?.let { it.copy(songs = it.songs.filterNot(dismissed::has)) }
+}
+
+// The line under Discover's updated line saying what its picks are seeded
+// by: the listening history only when a playlist actually came from it.
+internal fun seededLine(batch: DiscoverBatch): String? =
+    if (batch.sections.any { it.kind == SectionKind.Playlist && themeOfKey(it.key) == "history" }) "Seeded by your library and listening history" else null
 
 // What the tab shows for what the repository holds now. A batch kept for
 // another server than the one in use is not shown.
@@ -111,9 +132,20 @@ class DiscoverViewModel @Inject constructor(
 
     fun onShown() = repository.refreshIfStale()
 
+    // The Refresh button: the next generation, other playlists, made behind
+    // the batch on screen (the updated line says "Finding more…").
+    fun refresh() = repository.refresh()
+
+    // The picks turned down, for a playlist page kept open over a new batch.
+    val dismissed: StateFlow<Dismissed> = repository.dismissed
+
     // Plays a section's songs as shown, from the one tapped.
     fun play(songs: List<TrackEntity>, index: Int) =
         playback.playTracks(songs.map { it.id }, index, source = DISCOVER_SOURCE)
+
+    // A curated playlist, in order from `index` or shuffled, under its name.
+    fun playPlaylist(playlist: DiscoverSection, index: Int = 0, shuffle: Boolean = false) =
+        playback.playTracks(playlist.songs.map { it.id }, index, shuffle = shuffle, source = playlist.title)
 
     fun notInterested(track: TrackEntity) {
         repository.dismissSong(track)

@@ -106,6 +106,9 @@ import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import app.winters.octo.design.bodyType
 import app.winters.octo.theme.BarWish
+import app.winters.octo.theme.LocalActiveTheme
+import app.winters.octo.theme.PlayerLayout
+import app.winters.octo.theme.playerLayoutFor
 import app.winters.octo.theme.LocalBarRequest
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -214,8 +217,12 @@ fun AnimatedVisibilityScope.PlayerOverlay(
     val lyricsWanted by model.lyricsOpen.collectAsStateWithLifecycle()
     val configuration = LocalConfiguration.current
     val upright = configuration.screenHeightDp >= configuration.screenWidthDp
+    // Music Space's circle player, upright, for a song; every other case
+    // keeps the player as it was.
+    val circle = playerLayoutFor(LocalActiveTheme.current, upright, live = now.live != null) == PlayerLayout.Circle
     val loop = playerLoop(prefs.animatedArt, animated, upright, live = now.live != null)
-    val tall = (loop as? PlayerLoop.Backdrop)?.clip
+    // The circle player has its own gradient behind it, so no tall loop.
+    val tall = if (circle) null else (loop as? PlayerLoop.Backdrop)?.clip
     // Under a tall loop the background is drawn brighter, and the words'
     // color and its dimming follow that.
     val colors = if (tall != null) brightColors else plainColors
@@ -224,7 +231,8 @@ fun AnimatedVisibilityScope.PlayerOverlay(
     // the album's name follow the loop's brightness there.
     val context = LocalContext.current
     val lightTop by produceState(false, tall) { value = tall?.let { LoopTops.lightTop(context, it) } ?: false }
-    val inkWanted = colors.content
+    // The circle player's gradient is always dark enough for white.
+    val inkWanted = if (circle) Color.White else colors.content
     val topInk = tall?.let { if (lightTop) DarkInk else Color.White }
     val base by animateColorAsState(colors.base, tween(600), label = "player base")
     val ink by animateColorAsState(inkWanted, tween(CoverFadeMs.toInt()), label = "player ink")
@@ -356,7 +364,11 @@ fun AnimatedVisibilityScope.PlayerOverlay(
                     }
                 } else {
                     Box(Modifier.fillMaxSize().hazeSource(backdrop)) {
-                        PlayerBackground(prefs, colors, now, dolly = { dolly.value }, glass = glass)
+                        if (circle) {
+                            CircleBackground(plainColors, hasArt = now.artwork != null)
+                        } else {
+                            PlayerBackground(prefs, colors, now, dolly = { dolly.value }, glass = glass)
+                        }
                     }
                 }
             }
@@ -386,6 +398,7 @@ fun AnimatedVisibilityScope.PlayerOverlay(
                         showTime = true
                     },
                     onChooseLyrics = { showLyricsChooser = true },
+                    circle = circle,
                 )
             }
         }
@@ -430,6 +443,7 @@ private fun AnimatedVisibilityScope.PlayerContent(
     onOpenSleep: () -> Unit,
     onOpenSpeed: () -> Unit,
     onChooseLyrics: () -> Unit,
+    circle: Boolean = false,
 ) {
     val lyricsWanted by model.lyricsOpen.collectAsStateWithLifecycle()
     // A live station has no lyrics to show.
@@ -509,11 +523,20 @@ private fun AnimatedVisibilityScope.PlayerContent(
                     label = "controls shown",
                 )
                 with(player) {
-                    UprightPlayer(
-                        now, model, calm, folded = lyricsOpen, shown = { shown },
-                        header = header, artModifier = artModifier,
-                        onClose = onClose, onOpenArtist = onOpenArtist, onOpenQueue = onOpenQueue, onOpenSleep = onOpenSleep, onOpenSpeed = onOpenSpeed,
-                    )
+                    if (circle) {
+                        CirclePlayer(
+                            now, model, calm, folded = lyricsOpen, shown = { shown },
+                            artModifier = artModifier,
+                            onClose = onClose, onOpenArtist = onOpenArtist, onOpenAlbum = onOpenAlbum,
+                            onOpenQueue = onOpenQueue, onOpenSleep = onOpenSleep, onOpenSpeed = onOpenSpeed,
+                        )
+                    } else {
+                        UprightPlayer(
+                            now, model, calm, folded = lyricsOpen, shown = { shown },
+                            header = header, artModifier = artModifier,
+                            onClose = onClose, onOpenArtist = onOpenArtist, onOpenQueue = onOpenQueue, onOpenSleep = onOpenSleep, onOpenSpeed = onOpenSpeed,
+                        )
+                    }
                 }
                 AnimatedVisibility(
                     visible = lyricsOpen,
@@ -541,7 +564,7 @@ private val LyricsBarBleed = 12.dp
 
 // The line across the top holds only the album's name, so it stays low
 // and leaves the room to the artwork.
-private val TopLineHeight = 40.dp
+internal val TopLineHeight = 40.dp
 
 // The album's name's shadow over a tall loop, the other way from its ink.
 private fun loopCaptionShadow(ink: Color) =
@@ -709,7 +732,7 @@ private fun AnimatedVisibilityScope.ArtStage(
 // Finishes a swipe of the artwork. A skip carries it on out the way it was
 // going, changes the song, and brings the new one in from the other side;
 // otherwise it springs back.
-private suspend fun settleSwipe(
+internal suspend fun settleSwipe(
     skip: SwipeSkip,
     width: Float,
     current: () -> Float,
@@ -797,7 +820,7 @@ private fun AnimatedVisibilityScope.UprightPlayer(
 }
 
 // Takes every touch before what is under it can, for controls put away.
-private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.swallowTouches() {
+internal suspend fun androidx.compose.ui.input.pointer.PointerInputScope.swallowTouches() {
     awaitPointerEventScope {
         while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() }
     }
@@ -848,7 +871,7 @@ private val BarGap = 10.dp
 
 // The rise and fade the controls come in with as the player opens.
 @Composable
-private fun AnimatedVisibilityScope.risesIn(): Modifier {
+internal fun AnimatedVisibilityScope.risesIn(): Modifier {
     val density = LocalDensity.current
     return Modifier.animateEnterExit(
         enter = slideInVertically(spring(0.68f, 400f, IntOffset.VisibilityThreshold)) {
@@ -1024,7 +1047,7 @@ private fun AnimatedVisibilityScope.PlayerArt(
 // What the player's loops need further down: the square loop for the
 // cover's place and what it does now, and how far the cover has gone for
 // the tall loop (read while drawing).
-private class PlayerLoopState(
+internal class PlayerLoopState(
     val square: AnimatedClip?,
     val play: LoopPlay,
     val coverAway: () -> Float,
@@ -1032,7 +1055,7 @@ private class PlayerLoopState(
     val topInk: Color? = null,
 )
 
-private val LocalPlayerLoop = compositionLocalOf { PlayerLoopState(null, LoopPlay.StillOnly, { 0f }) }
+internal val LocalPlayerLoop = compositionLocalOf { PlayerLoopState(null, LoopPlay.StillOnly, { 0f }) }
 
 // The song's cover filling the player, for a tall loop with no still.
 @Composable
@@ -1043,7 +1066,7 @@ private fun CoverFill(ref: String?) {
 }
 
 // How strong the artist line under the full player's title is.
-private const val ArtistLineAlpha = 0.72f
+internal const val ArtistLineAlpha = 0.72f
 
 // The song's name and artist, close together so they read as one. A name
 // too long for its room scrolls through (unless motion is `calm`), and
@@ -1121,7 +1144,7 @@ private fun SongButtons(now: NowPlaying, model: PlayerViewModel) {
 }
 
 @Composable
-private fun LikeButton(model: PlayerViewModel) {
+internal fun LikeButton(model: PlayerViewModel) {
     val liked by model.liked.collectAsStateWithLifecycle()
     // The heart beats once as a song is liked.
     val pulse = rememberIconAccent(IconAccent.Pulse)
@@ -1189,7 +1212,7 @@ private fun Progress(now: NowPlaying, model: PlayerViewModel, onOpenSpeed: () ->
 // "OPUS". A tap shows everything, like "FLAC · 24-bit · 48 kHz", for a few
 // seconds.
 @Composable
-private fun QualityBadge(quality: AudioQuality, modifier: Modifier) {
+internal fun QualityBadge(quality: AudioQuality, modifier: Modifier) {
     var open by remember(quality) { mutableStateOf(false) }
     LaunchedEffect(open) {
         if (open) {
@@ -1230,7 +1253,7 @@ private fun QualityBadge(quality: AudioQuality, modifier: Modifier) {
 
 // A small "1.25x" beside the quality label while music plays at another speed.
 @Composable
-private fun SpeedMark(speed: Float, onClick: () -> Unit) {
+internal fun SpeedMark(speed: Float, onClick: () -> Unit) {
     Text(
         speedLabel(speed),
         style = BadgeLabel.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp),
@@ -1286,7 +1309,7 @@ private fun Transport(now: NowPlaying, model: PlayerViewModel) {
 // The phone's media volume, quiet on the left and loud on the right. It
 // follows the volume buttons too.
 @Composable
-private fun Volume(model: PlayerViewModel) {
+internal fun Volume(model: PlayerViewModel) {
     val volume by model.volume.collectAsStateWithLifecycle()
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Icon(painterResource(OctoIcons.VolumeDown), contentDescription = null, tint = mutedInk, modifier = Modifier.size(20.dp))
@@ -1309,7 +1332,7 @@ private fun Volume(model: PlayerViewModel) {
 // and springs back, back and next nudge the way they go, and play and pause
 // pop from one to the other.
 @Composable
-private fun TransportButton(
+internal fun TransportButton(
     @DrawableRes icon: Int,
     description: String,
     iconSize: Dp,
@@ -1381,7 +1404,7 @@ internal fun Modifier.closesPlayer(onClose: () -> Unit): Modifier = semantics { 
 // glowing while its setting is on and dimmed while off, the way the
 // progress line glows where it has played.
 @Composable
-private fun ActionButton(
+internal fun ActionButton(
     @DrawableRes icon: Int,
     description: String,
     on: Boolean,
@@ -1408,7 +1431,7 @@ private fun ActionButton(
 }
 
 @Composable
-private fun SleepCircle(model: PlayerViewModel, onClick: () -> Unit) {
+internal fun SleepCircle(model: PlayerViewModel, onClick: () -> Unit) {
     val sleep by model.sleep.collectAsStateWithLifecycle()
     val minutes = (sleep as? SleepState.Counting)?.let { ((it.remainingMs + 59_999) / 60_000).toInt() }
     Box {
@@ -1457,10 +1480,10 @@ private fun LightOnDarkBars(darkIcons: Boolean, darkStatus: Boolean = darkIcons)
 }
 
 // The song's name in the player.
-private val TitleStyle = OctoType.title.copy(fontWeight = FontWeight.Bold)
+internal val TitleStyle = OctoType.title.copy(fontWeight = FontWeight.Bold)
 
 // The room between the player's content and the screen's sides.
-private val PlayerSideMargin = 24.dp
+internal val PlayerSideMargin = 24.dp
 
 // How far the artist line sits up into the room under the name, so the two
 // read as one: inside the name's line spacing, clear of its descenders.

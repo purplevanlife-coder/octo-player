@@ -1,5 +1,6 @@
 package app.winters.octo.ui.history
 
+import app.winters.octo.ui.common.topBarRoom
 import app.winters.octo.ui.common.MoreItem
 import app.winters.octo.ui.common.LineSegments
 import app.winters.octo.ui.common.LineItem
@@ -111,7 +112,7 @@ fun HistoryScreen(startMostPlayed: Boolean, onBack: () -> Unit, vm: HistoryViewM
     var most by rememberSaveable { mutableStateOf(startMostPlayed) }
     val sheet = LocalChoiceSheet.current
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp)) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp + topBarRoom())) {
             PageHeader(
                 "History",
                 onBack,

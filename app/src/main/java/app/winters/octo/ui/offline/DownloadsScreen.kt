@@ -1,5 +1,6 @@
 package app.winters.octo.ui.offline
 
+import app.winters.octo.ui.common.topBarRoom
 import app.winters.octo.design.bodyType
 import app.winters.octo.ui.common.sortItem
 import androidx.compose.foundation.background
@@ -210,7 +211,7 @@ fun DownloadsScreen(onBack: () -> Unit, vm: OfflineDownloadsViewModel = hiltView
     val state = rememberLazyListState()
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp)) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp + topBarRoom())) {
             val paged = handle
             val asked = paged?.asked?.collectAsStateWithLifecycle()?.value
             val any = anyKnown == true && asked != null

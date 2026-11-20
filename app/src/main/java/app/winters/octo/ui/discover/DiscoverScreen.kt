@@ -1,6 +1,24 @@
 package app.winters.octo.ui.discover
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import app.winters.octo.design.OctoShapes
+import app.winters.octo.ui.common.Artwork
+import app.winters.octo.ui.common.ArtworkFill
+import app.winters.octo.ui.common.playShuffleItems
+import app.winters.octo.ui.home.songCountLine
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,16 +89,18 @@ import app.winters.octo.ui.nav.ServerListRoute
 // For You shows this many rows until "Show all".
 private const val FOR_YOU_FOLDED = 8
 
-// The Discover tab: new music picked from what is played, as the Music
+// The Discover tab: new music picked from what is played, headed by the
+// batch's curated playlists (each opening its own page), then as the Music
 // Space's Discover lays it out (For You, artists along the chains, the genre
 // lanes), with the server's own lists and chart after. Built from Home's
 // parts in Octo's look. It draws the batch kept on disk from its first
-// frame; a pull makes a new one while this one stays.
+// frame; Refresh (or a pull) makes the next generation while this one stays.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverScreen(onOpen: (NavKey) -> Unit, vm: DiscoverViewModel = hiltViewModel()) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val runsOcto by vm.runsOcto.collectAsStateWithLifecycle()
+    val dismissed by vm.dismissed.collectAsStateWithLifecycle()
     // Kept with the tab's page, so coming back finds it where it was.
     val list = rememberLazyListState()
 
@@ -89,13 +109,35 @@ fun DiscoverScreen(onOpen: (NavKey) -> Unit, vm: DiscoverViewModel = hiltViewMod
         onPauseOrDispose { }
     }
 
+    // A curated playlist's page, opened in Discover's own place (by its key,
+    // kept across a restart) and closed by Back. It shows the batch's copy;
+    // when a new batch lands without it, the copy last seen stays.
+    var openKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastOpen by remember { mutableStateOf<DiscoverSection?>(null) }
+    val shownBatch = (ui as? DiscoverUi.Ready)?.batch
+    val playlist = playlistShown(openKey, shownBatch, lastOpen, dismissed)
+    LaunchedEffect(playlist) { if (playlist != null) lastOpen = playlist }
+    // Kept open across a restart but no longer in the batch read back: closed.
+    LaunchedEffect(openKey, ui) { if (openKey != null && playlist == null && ui !is DiscoverUi.Reading) openKey = null }
+    BackHandler(enabled = openKey != null) { openKey = null }
+    if (openKey != null && playlist != null) {
+        PlaylistPage(playlist, vm, onBack = { openKey = null })
+        return
+    }
+
     PullToRefreshBox(
         isRefreshing = vm.pulled,
         onRefresh = vm::pull,
         modifier = Modifier.fillMaxSize(),
     ) {
         LazyColumn(Modifier.fillMaxSize(), state = list, contentPadding = screenPadding()) {
-            item(key = "header") { PageHeader("Discover", onBack = null) }
+            item(key = "header") {
+                PageHeader(
+                    "Discover",
+                    onBack = null,
+                    trailing = { if (ui !is DiscoverUi.SignedOut) RefreshButton(busy = making(ui), onClick = vm::refresh) },
+                )
+            }
             when (val shown = ui) {
                 DiscoverUi.SignedOut -> note("signed-out", "Nothing to discover yet", "Sign in to a server, and Discover finds new music from what you play.")
                 // Only for a moment at start, before the kept batch is read.
@@ -109,6 +151,8 @@ fun DiscoverScreen(onOpen: (NavKey) -> Unit, vm: DiscoverViewModel = hiltViewMod
                 is DiscoverUi.Ready -> {
                     item(key = "updated") { UpdatedLine(shown.batch, shown.making) }
                     if (shown.batch.sections.isEmpty()) emptyNote(runsOcto)
+                    // The curated playlists head the tab; the rest follow as before.
+                    playlistGrid(shown.batch.sections.filter { it.kind == SectionKind.Playlist }) { openKey = it.key }
                     shown.batch.sections.forEach { section(it, vm, onOpen) }
                 }
             }
@@ -116,11 +160,140 @@ fun DiscoverScreen(onOpen: (NavKey) -> Unit, vm: DiscoverViewModel = hiltViewMod
     }
 }
 
-// When the batch was made, under the title, and that a new one is on its way.
+// Whether a batch is being made now, for the Refresh button.
+private fun making(ui: DiscoverUi): Boolean = when (ui) {
+    is DiscoverUi.Ready -> ui.making
+    is DiscoverUi.NoBatch -> ui.making
+    else -> false
+}
+
+// When the batch was made, under the title, and that a new one is on its
+// way; then what its picks are seeded by.
 @Composable
 private fun UpdatedLine(batch: DiscoverBatch, making: Boolean) {
     val words = updatedLine(batch.generatedAt, System.currentTimeMillis()) + if (making) " · Finding more…" else ""
-    Text(words, style = bodyType(OctoType.caption), color = OctoColors.TextMuted, modifier = Modifier.padding(horizontal = 20.dp))
+    Column(Modifier.padding(horizontal = 20.dp)) {
+        Text(words, style = bodyType(OctoType.caption), color = OctoColors.TextMuted)
+        seededLine(batch)?.let { Text(it, style = bodyType(OctoType.caption), color = OctoColors.TextMuted) }
+    }
+}
+
+// Refresh, at the end of the title's line: asks for the next generation
+// (other playlists, other songs). While a batch is being made it turns a
+// small spinner in place of its icon and does nothing more; the batch on
+// screen stays until the new one lands.
+@Composable
+private fun RefreshButton(busy: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .heightIn(min = 48.dp)
+            .clip(CircleShape)
+            .glassPanel(CircleShape)
+            .clickable(enabled = !busy, role = Role.Button, onClickLabel = "Find new playlists", onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (busy) {
+            CircularProgressIndicator(color = OctoColors.TextPrimary, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+        } else {
+            Icon(painterResource(OctoIcons.Sync), contentDescription = null, tint = OctoColors.TextPrimary, modifier = Modifier.size(18.dp))
+        }
+        Text("Refresh", style = OctoType.label, color = OctoColors.TextPrimary, maxLines = 1)
+    }
+}
+
+// The curated playlists, two tiles a row, under their own title.
+private fun LazyListScope.playlistGrid(playlists: List<DiscoverSection>, onOpen: (DiscoverSection) -> Unit) {
+    if (playlists.isEmpty()) return
+    item(key = "title:playlists") {
+        Column(Modifier.padding(top = 18.dp)) {
+            SectionTitle("Playlists for you")
+            Text(
+                "${playlists.size} playlists from what you play. Refresh for others.",
+                style = bodyType(OctoType.caption),
+                color = OctoColors.TextMuted,
+                modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp),
+            )
+        }
+    }
+    playlists.chunked(2).forEach { pair ->
+        item(key = "playlists:${pair.first().key}") {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                pair.forEach { PlaylistTile(it, Modifier.weight(1f)) { onOpen(it) } }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+// One playlist: a square of its first covers (four when it has four
+// different ones), its name, and its line.
+@Composable
+private fun PlaylistTile(playlist: DiscoverSection, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val covers = remember(playlist) { playlist.songs.mapNotNull { it.artwork }.distinct().take(4) }
+    Column(modifier.clickable(role = Role.Button, onClickLabel = "Open ${playlist.title}", onClick = onClick)) {
+        if (covers.size < 4) {
+            ArtworkFill(covers.firstOrNull())
+        } else {
+            BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(1f).clip(OctoShapes.ArtM)) {
+                val half = maxWidth / 2
+                Column {
+                    covers.chunked(2).forEach { row ->
+                        Row { row.forEach { Artwork(it, half, shape = RectangleShape, rim = false) } }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            playlist.title,
+            style = bodyType(OctoType.bodySmall.copy(fontWeight = FontWeight.SemiBold)),
+            color = OctoColors.TextPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        playlist.subtitle?.let {
+            Text(it, style = bodyType(OctoType.caption), color = OctoColors.TextMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+// A curated playlist's own page: its name with Play and Shuffle, its line,
+// and its songs as rows with the add button and Not interested, as For You.
+// A song turned down here leaves the playlist (and every section) at once.
+@Composable
+private fun PlaylistPage(playlist: DiscoverSection, vm: DiscoverViewModel, onBack: () -> Unit) {
+    val menu = remember(vm) { pickMenu(vm) }
+    val songs = playlist.songs
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = screenPadding()) {
+        item(key = "header") {
+            PageHeader(
+                playlist.title,
+                onBack = onBack,
+                count = songCountLine(songs.size),
+                tail = playShuffleItems(
+                    onPlay = { vm.playPlaylist(playlist) },
+                    onShuffle = { vm.playPlaylist(playlist, shuffle = true) },
+                    enabled = songs.isNotEmpty(),
+                ),
+            )
+        }
+        playlist.subtitle?.let { line ->
+            item(key = "line") {
+                Text(line, style = bodyType(OctoType.caption), color = OctoColors.TextMuted, modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp))
+            }
+        }
+        if (songs.isEmpty()) {
+            note("emptied", "Nothing left here", "Every song in this playlist was turned down. Refresh Discover for new playlists.")
+        }
+        itemsIndexed(songs, key = { _, track -> track.id }) { index, track ->
+            SongRow(track, menuContext = menu, offerAdd = true, onClick = { vm.playPlaylist(playlist, index) })
+        }
+    }
 }
 
 private fun LazyListScope.section(section: DiscoverSection, vm: DiscoverViewModel, onOpen: (NavKey) -> Unit) {
@@ -130,6 +303,8 @@ private fun LazyListScope.section(section: DiscoverSection, vm: DiscoverViewMode
         SectionKind.Lane -> songShelf(section, vm)
         SectionKind.Charts -> songShelf(section, vm, onTitle = { onOpen(ChartsRoute) })
         SectionKind.MadeForYou, SectionKind.Stations -> stationShelf(section, vm, onOpen)
+        // Drawn together at the top, as the playlist grid.
+        SectionKind.Playlist -> Unit
     }
 }
 

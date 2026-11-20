@@ -5,6 +5,7 @@ import androidx.room.Room
 import app.winters.octo.discover.DISCOVER_DB_FILE
 import app.winters.octo.discover.DiscoverDao
 import app.winters.octo.discover.DiscoverDatabase
+import app.winters.octo.discover.DiscoverMigrations
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,7 +21,7 @@ object DiscoverModule {
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): DiscoverDatabase =
-        Room.databaseBuilder(context, DiscoverDatabase::class.java, DISCOVER_DB_FILE).build()
+        Room.databaseBuilder(context, DiscoverDatabase::class.java, DISCOVER_DB_FILE).addMigrations(*DiscoverMigrations).build()
 
     @Provides
     fun dao(db: DiscoverDatabase): DiscoverDao = db.dao()

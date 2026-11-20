@@ -1,5 +1,6 @@
 package app.winters.octo.ui.library
 
+import app.winters.octo.ui.common.topBarRoom
 import app.winters.octo.design.bodyType
 import app.winters.octo.ui.common.sortItem
 import app.winters.octo.ui.common.playShuffleItems
@@ -459,7 +460,7 @@ private fun LibraryPage(
 ) {
     Refreshable {
         CollapsingHeader(
-            Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp),
+            Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp + topBarRoom()),
             header = {
                 Column {
                     PageHeader(title, onBack, count = count, lead = lead, tail = tail, more = more)

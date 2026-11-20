@@ -1,5 +1,6 @@
 package app.winters.octo.discover
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -9,6 +10,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
@@ -17,17 +20,33 @@ import kotlinx.coroutines.flow.Flow
 // meets it. Everything here is a cache except the dismissals, which are
 // the listener's choices: a future version bump must migrate (or at least
 // keep) discover_dismissed rather than drop it.
-const val DISCOVER_DB_VERSION = 1
+const val DISCOVER_DB_VERSION = 2
 const val DISCOVER_DB_FILE = "discover.db"
 
+// Version 2 adds the batch's generation (DiscoverBatch.generation) to its
+// head row, a column with a default, in place: every other table, and
+// above all discover_dismissed, is left exactly as it was.
+internal const val ADD_GENERATION_SQL = "ALTER TABLE discover_batch ADD COLUMN generation INTEGER NOT NULL DEFAULT 0"
+
+val DiscoverMigration1To2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(ADD_GENERATION_SQL)
+    }
+}
+
+// Every step from an older discover.db, for the database's builder.
+val DiscoverMigrations: Array<Migration> = arrayOf(DiscoverMigration1To2)
+
 // The latest batch's head, per server and account (`owner`, see
-// DiscoverRepository.ownerOf): when it was made, and the format its
-// sections were written in (a batch of another format is not read).
+// DiscoverRepository.ownerOf): when it was made, the format its sections
+// were written in (a batch of another format is not read), and its
+// generation (0 for one kept before generations were).
 @Entity(tableName = "discover_batch")
 data class DiscoverBatchEntity(
     @PrimaryKey val owner: String,
     val generatedAt: Long,
     val format: Int,
+    @ColumnInfo(defaultValue = "0") val generation: Long = 0,
 )
 
 // One section of that batch, in its place: what it is, and its items as

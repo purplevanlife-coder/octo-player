@@ -140,6 +140,67 @@ commit. Full write-up: `PHASE2-COMPONENTS-NOTES.md`. No Gradle run, nothing push
   (see APK deliveries). Still to come after this round: the sage fill-accent role
   and the 18 dp per-theme radius (needs a radius token first).
 
+### Phase 3 — circle player, Discover playlists + Refresh, Takeout seeds, top bar, floating bubble, page swipe (2026-11-20, two Claude Code sessions + coordinator)
+
+Collin's requests (2026-11-20 ~10:34–10:41 PST), six items in one round. Brief:
+`PHASE3-PLAYER-DISCOVER-BRIEF.md`; full write-up: `PHASE3-NOTES.md`.
+
+1. **Full player redesign** (reference image `~/workspace/user/files/3787_4_2oq6.jpg`):
+   Music Space only, phone upright, songs. Circular artwork (~74% of width) with
+   the progress as a **ring that is also the seek control** (tap/drag on the ring;
+   artwork touches still swipe to skip), artwork-palette gradient background
+   darkened to ≥ 4.6:1 for white text (Forest page gradient when no art), album
+   name top line (playback carries no queue/context name), centred title/artist,
+   control row shuffle · prev · big cream play/pause · next · heart, secondary
+   rows keep lyrics, queue, sleep, repeat, volume, speed and everything else
+   reachable. Landscape and live stations keep the existing player. The bar →
+   player shared-artwork flight is replaced by a fade under Music Space.
+2. **Discover: 12+ curated playlists + Refresh.** A batch always carries the
+   "From your listening history" playlist plus 11 rotating playlist sections
+   (12+ total), each 12–30 songs with an honest explainer line, a playlist
+   detail page (drawn inside Discover — a new nav route would have meant
+   touching MainShell's route registration in the Discover session; Back closes
+   it, re-tapping the Discover tab does not), and a prominent **Refresh**
+   button. Manual refresh (button or pull) builds the **next generation**:
+   rotating templates and in-playlist song rotation mean two generations in a
+   row never show the same set; same inputs + generation = same batch
+   (deterministic). The 6h staleness refresh keeps the generation. discover.db
+   migrated 1→2 (generation on the batch row); `discover_dismissed` untouched,
+   with a migration test proving dismissals survive.
+3. **Takeout seeds.** Coordinator-built asset
+   `app/src/main/assets/discover_takeout_seed.json` (41 KB) from the full
+   Takeout parse: top 300 artists / top 500 tracks by play count, title /
+   artist / plays ONLY (65,625 plays, 2021-05-18 → 2026-11-15; no URLs or
+   ids). Loaded once into memory; a missing/broken asset means an empty seed,
+   never a crash, nothing logged. Takeout artists join seed weighting at
+   `3.0 × ln(1 + plays)` (top artist ≈ 490 in-app plays; #300 ≈ 13), matched
+   to library artists/songs by normalised name; the top 3 unmatched Takeout
+   artists also seed a server name-search chain. "From your listening history"
+   lists matched songs by play count, only when ≥ 8 match; UI copy says
+   "Seeded by your library and listening history" — no Google/file mentions.
+4. **Control bar at the TOP** (Music Space): the tab capsule docks under the
+   status bar, shadow falling down; pages reserve its height at the top via a
+   new `LocalTopBarRoom` seam (0 under other themes) and keep only 88 dp at
+   the bottom. The now-playing capsule leaves the bar (see 5).
+5. **Free-floating now-playing bubble** (Music Space): tap opens the player,
+   drag moves it (dragging never opens/toggles), position persisted as screen
+   fractions + size in its own small prefs store, clamped on-screen. Resize
+   ships as **long-press → smaller / play-pause / bigger row** — pinch was
+   rejected in-session because on a 48–64 dp bubble the second finger lands
+   outside it. Bounds 48–128 dp. With nothing loaded it still shows, with the
+   same shuffle-the-library play the old round button had.
+6. **Swipe between pages** (Music Space): a `HorizontalPager` whose pages each
+   host that tab's existing NavHost, so back stacks, scroll and view models
+   survive; the bar pill follows the swipe and bar taps animate the pager.
+   Shelf drags scroll shelves (standard pager nested scroll); the bubble
+   consumes only its own touches.
+
+- **CI result:** _(pending — filled in after the run.)_
+- Still outstanding after this round: sage fill-accent role, 18 dp per-theme
+  radius, the `DiscoverDatabase/2.json` schema export to commit from the CI
+  build, and on-phone checks of ring/artwork gestures, bubble tap-vs-drag,
+  shelf-vs-page swipe feel, and the top bar over the Home header.
+
 ## Notes
 
 - **Push route:** plain `git push` has no credential path on this VM. Commits are

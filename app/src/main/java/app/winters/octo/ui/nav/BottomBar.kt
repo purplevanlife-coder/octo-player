@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -79,6 +80,7 @@ import app.winters.octo.ui.common.detectAxisDrags
 import app.winters.octo.ui.common.isOutsideLibrary
 import app.winters.octo.ui.common.swipeSkip
 import app.winters.octo.ui.common.swipeUp
+import app.winters.octo.theme.BarDock
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -105,6 +107,12 @@ internal fun tabCapsuleWidth(column: Dp): Dp = minOf(62.dp, column)
 
 // The space between the bar and the bottom of the screen.
 val BarBottomGap = 14.dp
+
+// Docked at the top (Music Space): the space between the status bar and the
+// bar, and all the room the bar takes across the top of a page, which pages
+// keep clear through LocalTopBarRoom.
+val BarTopGap = 8.dp
+val TopBarRoom = BarTopGap + BarHeight
 private val TabIconSize = 23.dp
 private val Gap = 10.dp
 
@@ -124,7 +132,11 @@ class BarActions(
 
 // The floating bar. It has two shapes: tabs on the left with a round
 // now-playing button, or, once that button is tapped, the tabs folded into
-// one circle and the button grown into a small player.
+// one circle and the button grown into a small player. Under Music Space's
+// shell it docks at the top (`dock`), below the status bar, and the
+// now-playing button leaves it (`nowPlaying` false) to float as the bubble:
+// the tabs then take the bar's whole width, with the same icons, order,
+// destinations and gliding pill.
 @Composable
 fun BottomBar(
     haze: HazeState,
@@ -140,7 +152,10 @@ fun BottomBar(
     film: Color = GlazeTint,
     // The tabs carrying a small dot, by index, each with what it means.
     marks: Map<Int, String> = emptyMap(),
+    dock: BarDock = BarDock.Bottom,
+    nowPlaying: Boolean = true,
 ) {
+    val top = dock == BarDock.Top
     val grown by animateFloatAsState(if (playerShown) 1f else 0f, spring(0.75f, 200f), label = "bar shape")
     // The ring round the button is the only thing here that moves with the
     // song, a pixel or two a second, so it steps once a second, with the
@@ -151,16 +166,21 @@ fun BottomBar(
 
     BoxWithConstraints(
         modifier
-            .navigationBarsPadding()
-            .padding(start = 20.dp, end = 20.dp, bottom = BarBottomGap)
+            .then(
+                if (top) {
+                    Modifier.statusBarsPadding().padding(start = 20.dp, end = 20.dp, top = BarTopGap)
+                } else {
+                    Modifier.navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = BarBottomGap)
+                },
+            )
             .widthIn(max = 520.dp)
             .fillMaxWidth()
             .height(BarHeight),
     ) {
-        val fullTabs = maxWidth - BarHeight - Gap
+        val fullTabs = if (nowPlaying) maxWidth - BarHeight - Gap else maxWidth
         val tabsWidth = lerp(fullTabs, BarHeight, grown)
-        TabBar(haze, selected, grown, playerShown, fullTabs, Modifier.width(tabsWidth), actions, film, marks)
-        BarGlass(
+        TabBar(haze, selected, grown, playerShown, fullTabs, Modifier.width(tabsWidth), actions, film, marks, topDocked = top)
+        if (nowPlaying) BarGlass(
             haze,
             Modifier
                 .offset(x = tabsWidth + Gap)
@@ -221,6 +241,7 @@ private fun TabBar(
     actions: BarActions,
     film: Color,
     marks: Map<Int, String>,
+    topDocked: Boolean = false,
 ) {
     BarGlass(
         haze,
@@ -234,6 +255,7 @@ private fun TabBar(
                 onClick = actions.onShowTabs,
             ),
         film = film,
+        topDocked = topDocked,
     ) {
         val column = (fullWidth - 12.dp) / tabs.size
         val capsuleWidth = tabCapsuleWidth(column)

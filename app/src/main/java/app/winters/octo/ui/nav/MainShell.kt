@@ -136,6 +136,18 @@ import app.winters.octo.ui.sound.SoundScreen
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.snapshotFlow
+import app.winters.octo.theme.BarDock
+import app.winters.octo.theme.LocalActiveTheme
+import app.winters.octo.theme.shellLayoutFor
+import app.winters.octo.ui.common.LocalTopBarRoom
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
@@ -171,6 +183,53 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
     val changingTab = tabSeen[0] != selected
     SideEffect { tabSeen[0] = selected }
     val motion = motionScale()
+    // Music Space docks the bar at the top, floats the now-playing bubble
+    // and turns the tab pages by a swipe; every other theme keeps Octo's
+    // shell exactly (ShellLayout).
+    val shell = shellLayoutFor(LocalActiveTheme.current)
+    val topDocked = shell.dock == BarDock.Top
+    // Under Music Space the five tabs are pages side by side, each page
+    // drawing its own tab's pages, so a swipe turns from one to the next.
+    val pager = rememberPagerState(initialPage = selected) { stacks.size }
+    // Whether the pages are moving to a tab chosen some other way than a
+    // finger on them (the bar, Back, a link).
+    var gliding by remember { mutableStateOf(false) }
+    val fingerTurning = PagerSync.fingerTurning(scrolling = pager.isScrollInProgress, gliding = gliding)
+    if (shell.swipePages) {
+        LaunchedEffect(pager) {
+            // Coming into this shell (Music Space chosen), the pages start
+            // at the tab in front, without a glide.
+            if (pager.currentPage != selected) {
+                try {
+                    pager.scrollToPage(selected)
+                } catch (e: CancellationException) {
+                    currentCoroutineContext().ensureActive()
+                }
+            }
+            // A swipe that comes to rest selects its page.
+            launch {
+                snapshotFlow { pager.settledPage }.collect { page ->
+                    val next = PagerSync.selectedAfterRest(selected, page, gliding)
+                    if (next != selected) selected = next
+                }
+            }
+            // A tab chosen any other way glides the pages there (at once
+            // with motion reduced). A finger on the pages mid-glide takes
+            // over: the glide gives way and the swipe's rest decides.
+            snapshotFlow { selected }.collectLatest { target ->
+                if (PagerSync.mustGlide(target, pager.currentPage)) {
+                    gliding = true
+                    try {
+                        if (motion.still) pager.scrollToPage(target) else pager.animateScrollToPage(target)
+                    } catch (e: CancellationException) {
+                        currentCoroutineContext().ensureActive()
+                    } finally {
+                        gliding = false
+                    }
+                }
+            }
+        }
+    }
     // Every tab's pages, each tab keeping its own pages' state and view
     // models while another tab is in front, so coming back to a tab finds
     // it as it was left instead of building it again from empty.
@@ -290,6 +349,19 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
         onNext = playback::next,
     )
 
+    // The bubble's kept place, and what its touches do: a tap opens the
+    // player, or with nothing loaded shuffles the library, as the round
+    // button's does.
+    val bubbles = hiltViewModel<BubbleViewModel>()
+    val bubblePlace by bubbles.place.collectAsStateWithLifecycle()
+    val bubbleActions = BubbleActions(
+        onOpenPlayer = { playerOpen = true },
+        onPlayPause = playback::togglePlayPause,
+        onNext = playback::next,
+        onPrevious = playback::previous,
+        onKeep = bubbles::keep,
+    )
+
     // Access can be changed in system settings while the app is away.
     LifecycleResumeEffect(Unit) {
         library.refresh()
@@ -330,6 +402,8 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
         LocalOpenPage provides open,
         LocalNowPlayingId provides NowMark(now.trackId, now.isPlaying),
         LocalPlayerCovers provides (playerOpen && hasTrack),
+        // With the bar docked at the top, pages keep its room clear there.
+        LocalTopBarRoom provides (if (topDocked) TopBarRoom else 0.dp),
     ) {
         SharedTransitionLayout {
             // Any press marks where a menu it opens should float.
@@ -344,16 +418,46 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
                         .hazeSource(haze),
                 ) {
                     AmbientBackdrop(stack.lastOrNull(), now, pageArtworks, awake = !playerOpen)
-                    NavDisplay(
-                        entries = tabPages[selected],
-                        onBack = { stack.backOne() },
-                        // Turned sideways, pages keep clear of the camera cutout and
-                        // a side navigation bar; the glow still fills the screen.
-                        modifier = Modifier.fillMaxSize().windowInsetsPadding(SideInsets),
-                        transitionSpec = { if (changingTab) tabMotion(motion) else pushMotion(motion) },
-                        popTransitionSpec = { if (changingTab) tabMotion(motion) else popMotion(motion) },
-                        predictivePopTransitionSpec = { gestureMotion(motion) },
-                    )
+                    if (shell.swipePages) {
+                        // Each page hosts its own tab's NavDisplay, over the tab's own
+                        // back stack and kept entries, so turning pages never resets a
+                        // tab's pages, their scroll or their view models. Shelves that
+                        // scroll sideways take a sideways drag first; what they cannot
+                        // use turns the page (the pager's own nested scrolling). Not
+                        // while the full player is up: it is not a page.
+                        HorizontalPager(
+                            state = pager,
+                            modifier = Modifier.fillMaxSize(),
+                            beyondViewportPageCount = 0,
+                            userScrollEnabled = !playerOpen,
+                            key = { it },
+                        ) { page ->
+                            if (PagerSync.pageShowsContent(page, selected, pager.currentPage, fingerTurning)) {
+                                val pageStack = stacks[page]
+                                NavDisplay(
+                                    entries = tabPages[page],
+                                    onBack = { pageStack.backOne() },
+                                    modifier = Modifier.fillMaxSize().windowInsetsPadding(SideInsets),
+                                    transitionSpec = { pushMotion(motion) },
+                                    popTransitionSpec = { popMotion(motion) },
+                                    predictivePopTransitionSpec = { gestureMotion(motion) },
+                                )
+                            } else {
+                                Box(Modifier.fillMaxSize())
+                            }
+                        }
+                    } else {
+                        NavDisplay(
+                            entries = tabPages[selected],
+                            onBack = { stack.backOne() },
+                            // Turned sideways, pages keep clear of the camera cutout and
+                            // a side navigation bar; the glow still fills the screen.
+                            modifier = Modifier.fillMaxSize().windowInsetsPadding(SideInsets),
+                            transitionSpec = { if (changingTab) tabMotion(motion) else pushMotion(motion) },
+                            popTransitionSpec = { if (changingTab) tabMotion(motion) else popMotion(motion) },
+                            predictivePopTransitionSpec = { gestureMotion(motion) },
+                        )
+                    }
                 }
                 // The status bar's glass: what scrolls up under the clock is frosted. The full
                 // player, once it covers the pages, has its own top.
@@ -369,7 +473,7 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
                     visible = barShown(playerOpen, stack.lastOrNull()),
                     enter = fadeIn(tween(300)),
                     exit = fadeOut(tween(300)),
-                    modifier = Modifier.align(Alignment.BottomCenter),
+                    modifier = Modifier.align(if (topDocked) Alignment.TopCenter else Alignment.BottomCenter),
                 ) {
                     // The mirror of the player's card: a soft square while it
                     // flies back, a circle once it lands.
@@ -378,26 +482,53 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
                     }
                     BottomBar(
                         haze = haze,
-                        selected = selected,
+                        selected = if (shell.swipePages) PagerSync.barTab(selected, pager.currentPage, fingerTurning) else selected,
                         now = now,
                         positionMs = playback::positionMs,
-                        playerShown = barPlayer && hasTrack,
+                        playerShown = barPlayer && hasTrack && !shell.floatingNowPlaying,
                         actions = barActions,
                         artModifier = Modifier.sharedElement(rememberSharedContentState(ArtKey), this),
                         artShape = RoundedCornerShape(percent = corner),
                         film = barFilm.value,
                         marks = if (serverUpdateWaits) mapOf(stacks.lastIndex to SERVER_UPDATE_MARK) else emptyMap(),
+                        dock = shell.dock,
+                        nowPlaying = !shell.floatingNowPlaying,
                     )
                 }
                 // Songs on their way: a small pill above the bar, on the
                 // right, that opens the server downloads sheet when tapped.
+                // With the bar at the top it sits low on the left instead, clear
+                // of the bubble's first place on the right.
                 AnimatedVisibility(
                     visible = barShown(playerOpen, stack.lastOrNull()),
                     enter = fadeIn(tween(300)),
                     exit = fadeOut(tween(300)),
-                    modifier = Modifier.align(Alignment.BottomEnd),
+                    modifier = Modifier.align(if (topDocked) Alignment.BottomStart else Alignment.BottomEnd),
                 ) {
-                    DownloadsPill(haze, Modifier.navigationBarsPadding().padding(end = 20.dp, bottom = BarBottomGap + BarHeight + 10.dp))
+                    if (topDocked) {
+                        DownloadsPill(haze, Modifier.navigationBarsPadding().padding(start = 20.dp, bottom = BarBottomGap))
+                    } else {
+                        DownloadsPill(haze, Modifier.navigationBarsPadding().padding(end = 20.dp, bottom = BarBottomGap + BarHeight + 10.dp))
+                    }
+                }
+                // Music Space's now-playing bubble, free over the pages. It shows
+                // and hides with the bar, and once its kept place is read.
+                if (shell.floatingNowPlaying) {
+                    AnimatedVisibility(
+                        visible = barShown(playerOpen, stack.lastOrNull()),
+                        enter = fadeIn(tween(300)),
+                        exit = fadeOut(tween(300)),
+                    ) {
+                        bubblePlace?.let { place ->
+                            NowPlayingBubble(
+                                haze = haze,
+                                now = now,
+                                positionMs = playback::positionMs,
+                                place = place,
+                                actions = bubbleActions,
+                            )
+                        }
+                    }
                 }
                 AnimatedVisibility(
                     visible = playerOpen && hasTrack,

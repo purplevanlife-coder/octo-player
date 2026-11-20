@@ -15,12 +15,22 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
+import kotlin.math.abs
 
 // Which surface the bottom bar is drawn on in `glass`: the floating glaze,
 // or the theme's own player-bar surface.
 enum class BarLook { Glaze, Surface }
 
 fun barLookOf(glass: OctoGlass): BarLook = if (glass.playerBar == null) BarLook.Glaze else BarLook.Surface
+
+// The surface's shadow and hairline follow where the bar is docked: at the
+// bottom the shadow is cast upward and the hairline runs along the top edge,
+// as the reference draws it; docked at the top (Music Space's shell), the
+// shadow falls downward onto the page and the hairline runs along the
+// bottom edge, the side that faces the page.
+fun barShadowY(drop: GlassDrop, topDocked: Boolean): Float = if (topDocked) abs(drop.y) else drop.y
+
+fun barHairlineY(topDocked: Boolean): Float = if (topDocked) -1f else 1f
 
 // The glass of the bottom bar's parts. Where the theme's glass names a
 // player-bar surface (Music Space) the part sits on that near-opaque fill,
@@ -37,6 +47,8 @@ fun BarGlass(
     modifier: Modifier = Modifier,
     shape: Shape = CircleShape,
     film: Color = GlazeTint,
+    // Docked at the top of the screen rather than the bottom.
+    topDocked: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val bar = ThemeGlass.playerBar
@@ -48,12 +60,12 @@ fun BarGlass(
             Box(
                 Modifier
                     .matchParentSize()
-                    .dropShadow(shape, Shadow(radius = shadowBlur(bar.drop.blur), color = bar.drop.color, offset = DpOffset(0.dp, bar.drop.y.dp)))
+                    .dropShadow(shape, Shadow(radius = shadowBlur(bar.drop.blur), color = bar.drop.color, offset = DpOffset(0.dp, barShadowY(bar.drop, topDocked).dp)))
                     .clip(shape)
                     .background(bar.fill)
                     .then(if (film != plain) Modifier.background(film) else Modifier)
-                    // The hairline along the top edge.
-                    .innerShadow(shape, Shadow(radius = 0.dp, color = bar.edge, offset = DpOffset(0.dp, 1.dp))),
+                    // The hairline along the edge that faces the page.
+                    .innerShadow(shape, Shadow(radius = 0.dp, color = bar.edge, offset = DpOffset(0.dp, barHairlineY(topDocked).dp))),
             )
             content()
         }

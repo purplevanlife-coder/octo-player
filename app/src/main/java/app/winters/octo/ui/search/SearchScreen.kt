@@ -1,5 +1,7 @@
 package app.winters.octo.ui.search
 
+import app.winters.octo.ui.common.screenBottomRoom
+import app.winters.octo.ui.common.topBarRoom
 import app.winters.octo.design.bodyType
 import app.winters.octo.ui.common.LocalReduceMotion
 import app.winters.octo.ui.common.LocalOwnedFinds
@@ -130,7 +132,7 @@ fun SearchScreen(onOpen: (NavKey) -> Unit, vm: SearchViewModel = hiltViewModel()
     val owned = LocalOwnedFinds.current
     val top = if (libraryOnly) anyTop?.inLibraryOnly(owned) else anyTop
     val chart = if (libraryOnly) anyChart?.inLibraryOnly(owned) else anyChart
-    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 120.dp
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + screenBottomRoom(topDocked = topBarRoom() > 0.dp)
     val keyboard = LocalSoftwareKeyboardController.current
     val list = rememberLazyListState()
     val hider = rememberKeyboardHider(keyboard)
@@ -145,7 +147,7 @@ fun SearchScreen(onOpen: (NavKey) -> Unit, vm: SearchViewModel = hiltViewModel()
         list.requestScrollToItem(0)
     }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp)) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp + topBarRoom())) {
         // The field stands in for the page title; under it, one line: the
         // kind of result, as a dropdown since the kinds do not fit as chips,
         // then Library songs only.

@@ -1,5 +1,6 @@
 package app.winters.octo.ui.library.health
 
+import app.winters.octo.ui.common.topBarRoom
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -460,7 +461,7 @@ fun LibraryHealthScreen(onOpen: (NavKey) -> Unit, onBack: () -> Unit, vm: Health
     val lastUndo by vm.lastUndo.collectAsStateWithLifecycle()
     val canUndo = actions.canPutBack(lastUndo)
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp)) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp + topBarRoom())) {
             PageHeader("Library health", onBack)
             val report = shown.report()
             val problem = (shown as? HealthShown.Problem)?.words
@@ -510,7 +511,7 @@ fun LibraryHealthScreen(onOpen: (NavKey) -> Unit, onBack: () -> Unit, vm: Health
 fun HealthCheckScreen(checkName: String, onBack: () -> Unit, vm: HealthViewModel = hiltViewModel()) {
     val check = HealthCheck.entries.firstOrNull { it.name == checkName }
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp)) {
+        Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 8.dp + topBarRoom())) {
             if (check == null) {
                 PageHeader("Library health", onBack)
                 Words("This check is not in this version of the app.", muted = true)

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -20,12 +22,32 @@ import app.winters.octo.design.OctoType
 import app.winters.octo.design.displayType
 
 // Content starts below the status bar and ends above the floating bar.
+// Where the tab bar is docked at the top (Music Space), content starts below
+// it instead, and the bottom keeps only the room the floating bubble needs.
 @Composable
 fun screenPadding(extraTop: Dp = 0.dp): PaddingValues {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    return PaddingValues(top = top + 8.dp + extraTop, bottom = bottom + 120.dp)
+    val bar = topBarRoom()
+    return PaddingValues(top = top + 8.dp + extraTop + bar, bottom = bottom + screenBottomRoom(topDocked = bar > 0.dp))
 }
+
+// The room the tab bar takes across the top of every page, below the status
+// bar, when it is docked there: 0 where the bar sits at the bottom (every
+// theme but Music Space), so nothing moves under them. MainShell provides it.
+val LocalTopBarRoom = staticCompositionLocalOf { 0.dp }
+
+@Composable
+@ReadOnlyComposable
+fun topBarRoom(): Dp = LocalTopBarRoom.current
+
+// What a page keeps clear at its bottom, past the navigation bar: the
+// floating bar's room, or with the bar at the top only enough for the last
+// row to scroll clear of the now-playing bubble in its first place.
+fun screenBottomRoom(topDocked: Boolean): Dp = if (topDocked) TopDockedBottomRoom else BottomBarRoom
+
+val BottomBarRoom = 120.dp
+val TopDockedBottomRoom = 88.dp
 
 // A tab's big title, on the same line and baseline as every page header's.
 @Composable
@@ -50,7 +72,7 @@ val DetailTopGap = 56.dp
 // false it shows dimmed and takes no press.
 @Composable
 fun BackButton(onBack: () -> Unit, enabled: Boolean = true) {
-    Box(Modifier.statusBarsPadding().padding(start = 16.dp, top = 8.dp)) {
+    Box(Modifier.statusBarsPadding().padding(start = 16.dp, top = 8.dp + topBarRoom())) {
         GlazedIconButton(
             backdrop = LocalHaze.current,
             icon = LocalIconVectors.current(OctoIcons.Back),
