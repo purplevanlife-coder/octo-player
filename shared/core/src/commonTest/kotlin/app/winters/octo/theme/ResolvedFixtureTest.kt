@@ -28,11 +28,12 @@ class ResolvedFixtureTest {
         "$prefix.glassAccent" to hex(f.glassAccent),
     )
 
-    // Every resolved role for every theme, accent, cover seed and glass setting,
-    // keyed "<theme>/<accent>[/<art>]/glass-<on|off>/<role>", sorted by key.
+    // Every resolved role for every theme the fixture holds, accent, cover
+    // seed and glass setting, keyed
+    // "<theme>/<accent>[/<art>]/glass-<on|off>/<role>", sorted by key.
     private fun fixtureOf(): SortedMap<String, String> {
         val out = TreeMap<String, String>()
-        for (theme in ThemeChoice.entries) {
+        for (theme in fixtureThemes) {
             for (choice in AccentChoice.entries) {
                 val seeds: List<Int?> = if (choice == AccentChoice.FromArt) artSeeds else listOf(null)
                 for (art in seeds) {
@@ -72,6 +73,17 @@ class ResolvedFixtureTest {
             }
         }
         return out
+    }
+
+    // The fixture is the original five themes, byte for byte as committed:
+    // it proves they resolve exactly as before, and the iOS tests and
+    // FormColorsTest read the same file for those five. Music Space's own
+    // colors are pinned in MusicSpaceThemeTest.
+    private val fixtureThemes = listOf(ThemeChoice.Octo, ThemeChoice.Moss, ThemeChoice.Dusk, ThemeChoice.Daylight, ThemeChoice.Paper)
+
+    @Test
+    fun everyThemeButMusicSpaceIsInTheFixture() {
+        assertEquals(ThemeChoice.entries - ThemeChoice.MusicSpace, fixtureThemes)
     }
 
     private fun render(map: Map<String, String>) = map.entries.joinToString("") { "${it.key}=${it.value}\n" }

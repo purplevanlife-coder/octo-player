@@ -80,6 +80,20 @@ val ThemeChoice.base: ThemeBase get() = when (this) {
         glow = listOf(0xFFE8C9A0.toInt(), 0xFFC9D6B8.toInt(), 0xFFE7C1AE.toInt()),
         ink = 0xFF2A1F14.toInt(), inkSecondary = 650, inkTertiary = 250, offTrack = 500, shadow = 250,
     )
+    // Forest Glass. The reference's surfaces are see-through glass over a
+    // forest photo; the theme's layers are solid, so each is the glass laid
+    // over what it sits on: raised is --surface-alt over --bg (#2F3529),
+    // card is --surface over that (#23291E), far enough apart to step.
+    // The sheet is --bg at the player bar's 0.94. The accent is --accent2,
+    // the light sage: --accent (#7D9168) reads under 4.5:1 on the card and
+    // the raised layer, which every accent must clear.
+    ThemeChoice.MusicSpace -> ThemeBase(
+        page = ForestGlass.Bg, card = 0xFF23291E.toInt(), raised = 0xFF2F3529.toInt(), sheet = ForestGlass.Bg, sheetAlpha = 940,
+        edge = ForestGlass.Border, text = ForestGlass.Text, secondary = ForestGlass.Dim, muted = null,
+        accent = ForestGlass.Accent2, complement = ForestGlass.Amber, third = ForestGlass.Hand,
+        glow = listOf(0xFF2F5A2C.toInt(), 0xFF7A6236.toInt(), 0xFF143426.toInt()),
+        ink = ForestGlass.Text, inkSecondary = 600, inkTertiary = 250, offTrack = 400, shadow = 1000,
+    )
 }
 
 // The colors built from an accent, for one kind of surface.

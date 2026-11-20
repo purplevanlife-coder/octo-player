@@ -10,7 +10,11 @@ enum class ThemeChoice(val label: String, val light: Boolean) {
     Moss("Moss", false),
     Dusk("Dusk", false),
     Daylight("Daylight", true),
-    Paper("Paper", true);
+    Paper("Paper", true),
+
+    // The Music Space's Forest Glass look (ForestGlass.kt). Added after the
+    // first five so their order, and every stored name, stays as it was.
+    MusicSpace("Music Space", false);
 
     companion object {
         // The theme stored under `name`, or null for an unknown or newer one.

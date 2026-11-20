@@ -49,6 +49,8 @@ class ThemesTest {
 
     @Test
     fun storedNamesNeverChange() {
-        assertEquals(listOf("Octo", "Moss", "Dusk", "Daylight", "Paper"), ThemeChoice.entries.map { it.name })
+        assertEquals(listOf("Octo", "Moss", "Dusk", "Daylight", "Paper", "MusicSpace"), ThemeChoice.entries.map { it.name })
+        // The first five keep their places; a new theme only ever goes after them.
+        assertEquals(listOf("Octo", "Moss", "Dusk", "Daylight", "Paper"), ThemeChoice.entries.take(5).map { it.name })
     }
 }
