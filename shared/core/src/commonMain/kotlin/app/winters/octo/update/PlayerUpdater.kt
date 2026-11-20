@@ -13,8 +13,10 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 // The public repository the players' releases are published on, beside
-// the server's own.
-const val OCTO_REPOSITORY = "winters27/octo"
+// the server's own. Fork change: this build is Collin's fork, so the updater
+// looks at the fork's repository instead of upstream's — upstream releases
+// must never be offered to (or installed over) the fork build.
+const val OCTO_REPOSITORY = "purplevanlife-coder/octo-player"
 val GITHUB_API: HttpUrl = "https://api.github.com/".toHttpUrl()
 
 // How the updater's choices are kept, the same on both apps.

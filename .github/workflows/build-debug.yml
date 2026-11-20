@@ -24,6 +24,9 @@ jobs:
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
           "$SDKMANAGER" "platforms;android-37.0" "build-tools;37.0.0"
 
+      - name: Run unit tests
+        run: ./gradlew :shared:core:allTests :app:testDebugUnitTest --no-daemon
+
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug
 

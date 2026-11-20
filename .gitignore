@@ -12,3 +12,6 @@ captures/
 .claude/worktrees/
 
 __pycache__/
+
+# Fork build coordination: design reference stays local (read from working tree)
+music-space-ui-reference/
