@@ -42,6 +42,7 @@ object ThemeApplier {
         ThemeChoice.Dusk -> R.style.Theme_Octo_Splash_Dusk
         ThemeChoice.Daylight -> R.style.Theme_Octo_Splash_Daylight
         ThemeChoice.Paper -> R.style.Theme_Octo_Splash_Paper
+        ThemeChoice.MusicSpace -> R.style.Theme_Octo_Splash_MusicSpace
     }
 
     @StyleRes
@@ -49,11 +50,13 @@ object ThemeApplier {
         ThemeChoice.Paper -> when (dark) {
             ThemeChoice.Moss -> R.style.Theme_Octo_Splash_PaperMoss
             ThemeChoice.Dusk -> R.style.Theme_Octo_Splash_PaperDusk
+            ThemeChoice.MusicSpace -> R.style.Theme_Octo_Splash_PaperMusicSpace
             else -> R.style.Theme_Octo_Splash_PaperOcto
         }
         else -> when (dark) {
             ThemeChoice.Moss -> R.style.Theme_Octo_Splash_DaylightMoss
             ThemeChoice.Dusk -> R.style.Theme_Octo_Splash_DaylightDusk
+            ThemeChoice.MusicSpace -> R.style.Theme_Octo_Splash_DaylightMusicSpace
             else -> R.style.Theme_Octo_Splash_DaylightOcto
         }
     }

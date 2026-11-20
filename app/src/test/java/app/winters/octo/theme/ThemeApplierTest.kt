@@ -24,6 +24,7 @@ class ThemeApplierTest {
             ThemeChoice.Dusk to R.style.Theme_Octo_Splash_Dusk,
             ThemeChoice.Daylight to R.style.Theme_Octo_Splash_Daylight,
             ThemeChoice.Paper to R.style.Theme_Octo_Splash_Paper,
+            ThemeChoice.MusicSpace to R.style.Theme_Octo_Splash_MusicSpace,
         )
         ThemeChoice.entries.forEach { theme ->
             assertEquals(theme.name, expected.getValue(theme), ThemeApplier.splashStyleFor(ThemeSettings(theme = theme)))
@@ -40,6 +41,8 @@ class ThemeApplierTest {
             (ThemeChoice.Paper to ThemeChoice.Octo) to R.style.Theme_Octo_Splash_PaperOcto,
             (ThemeChoice.Paper to ThemeChoice.Moss) to R.style.Theme_Octo_Splash_PaperMoss,
             (ThemeChoice.Paper to ThemeChoice.Dusk) to R.style.Theme_Octo_Splash_PaperDusk,
+            (ThemeChoice.Daylight to ThemeChoice.MusicSpace) to R.style.Theme_Octo_Splash_DaylightMusicSpace,
+            (ThemeChoice.Paper to ThemeChoice.MusicSpace) to R.style.Theme_Octo_Splash_PaperMusicSpace,
         )
         val lights = ThemeChoice.entries.filter { it.light }
         val darks = ThemeChoice.entries.filter { !it.light }

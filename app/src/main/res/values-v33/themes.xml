@@ -27,6 +27,11 @@
         <item name="android:windowSplashScreenBackground">#FFEBE2D2</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_octopus</item>
     </style>
+    <style name="Theme.Octo.Splash.MusicSpace" parent="Theme.Octo">
+        <item name="android:windowBackground">#FF131A10</item>
+        <item name="android:windowSplashScreenBackground">#FF131A10</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_octopus</item>
+    </style>
 
     <style name="Theme.Octo.Splash.DaylightOcto" parent="Theme.Octo">
         <item name="android:windowBackground">@color/splash_daylight_octo</item>
@@ -56,6 +61,16 @@
     <style name="Theme.Octo.Splash.PaperDusk" parent="Theme.Octo">
         <item name="android:windowBackground">@color/splash_paper_dusk</item>
         <item name="android:windowSplashScreenBackground">@color/splash_paper_dusk</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_octopus</item>
+    </style>
+    <style name="Theme.Octo.Splash.DaylightMusicSpace" parent="Theme.Octo">
+        <item name="android:windowBackground">@color/splash_daylight_musicspace</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_daylight_musicspace</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_octopus</item>
+    </style>
+    <style name="Theme.Octo.Splash.PaperMusicSpace" parent="Theme.Octo">
+        <item name="android:windowBackground">@color/splash_paper_musicspace</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_paper_musicspace</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_octopus</item>
     </style>
 </resources>
