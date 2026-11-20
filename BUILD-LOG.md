@@ -129,7 +129,16 @@ commit. Full write-up: `PHASE2-COMPONENTS-NOTES.md`. No Gradle run, nothing push
 - **Tests:** ThemeFontsTest updated; new ThemeTypeTest, ThemeGlassTest. `resolved.txt`
   byte-identical; palette untouched, so the foundation contrast margins are unchanged;
   new glass surfaces hand-checked at ≥ 8.8:1 for `--dim`.
-- **CI result:** _(coordinator to fill in)_
+- **CI result (2026-11-20, coordinator follow-up):** the components commits were
+  mirror-pushed as one remote commit (78892605, tree identical to local a99d3e93).
+  First run 44752631533 failed on exactly one test, `LikedHiddenRaceTest`
+  (a gate-timing race test in Favourites; it passed in the foundation round's
+  reports and this round's diff touches no favourites, paging or catalog code),
+  judged a flake under a slow runner. Re-run 44763664261 came back **SUCCESS**:
+  6,394 tests across the shared-core and app suites, 0 failures, 0 errors
+  (foundation round: 6,386). APK delivered as `app-music-space-components-debug.apk`
+  (see APK deliveries). Still to come after this round: the sage fill-accent role
+  and the 18 dp per-theme radius (needs a radius token first).
 
 ## Notes
 
@@ -157,6 +166,11 @@ commit. Full write-up: `PHASE2-COMPONENTS-NOTES.md`. No Gradle run, nothing push
   this over the Discover build will likely require uninstalling the old debug build
   first (which loses its local data — the theme build's Discover dismissals are not
   backed up, see Phase 1 notes).
+- **Phase 2 components (fonts, glass, player bar): `~/workspace/your_files/octo-player-debug/app-music-space-components-debug.apk`**
+  — from run 44763664261 (feature/discover-v1 @ 78892605 remote), 98,249,558 bytes,
+  package app.winters.octo.debug, versionName 0.2.0-debug, signature verified and all
+  seven new font files confirmed inside `res/font`. The theme APK above stays in place
+  untouched. Same per-run debug-key caveat as the theme build.
 
 ### Phase 1 — Discover v1 implemented (2026-11-19, Claude Code session, ~25 min)
 
