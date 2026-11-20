@@ -57,6 +57,8 @@ Started: 2026-11-19 (America/Los_Angeles).
 | 44673134804 | feature/discover-v1 | + CI split (b8ee95f8 remote) | **failure** | Shared-core tests **passed** (5m). App tests: 725 classes / 3,531 tests completed with exactly **one failure** — upstream's `WholeTableGateTest` caught `DiscoverRepository` calling the whole-table `users.likedTracks()` (the gate forbids new whole-table reads; every other signal read was already bounded). All 9 new Discover test classes passed. The step then hit its 40-min cap a whisker from the end (last class finished 04:58:29, cap 05:00:15) — the suite is simply big. Fixes: bounded `UserDao.likedTracksLimited(limit)` (same SQL + LIMIT, newest-first) used by the repository; app-test cap raised to 60 min. |
 | 44678219131 | feature/discover-v1 | + gate fix (18d9662e remote) | **failure** | Shared tests passed; app suite ran to completion inside the 60-min cap: 726 classes / 3,531 tests, still exactly one failure — the gate moved to `UserDao.kt`: it scans raw text, and the explanatory comment on the new DAO method contained the literal whole-table call text, tripping the "streams now" rule for that file. Fixed by rewording the comment; a local simulation of the gate (its own regexes/sets run over the source tree) then reported zero callers and zero violations. |
 | 44683285029 | feature/discover-v1 | + comment fix (609d9a1a remote) | **SUCCESS** | **Phase 1 green.** Shared-core tests passed; app suite: 726 classes, **3,531 tests, 0 failures, 0 errors** (18 skipped); debug APK built and uploaded. APK verified as the fork build: package `app.winters.octo.debug`, versionName `0.2.0-debug`, and the dex contains the Discover classes (`DiscoverScreen`, 81 references to `app/winters/octo/discover` in classes18.dex). Delivered to `~/workspace/your_files/octo-player-debug/app-debug.apk` (97,926,559 bytes), replacing the stock baseline. **Not yet device-tested — only Collin's phone test proves it works.** |
+| 44690338173 | feature/discover-v1 | Phase 2 foundation, intermediate log commit (0acaf020 remote) | **cancelled** | Dispatched on the first Phase 2 push, then cancelled ~1 min in when the final log commit superseded it. No steps failed; shared-core tests were still running. |
+| 44690480834 | feature/discover-v1 | Phase 2 foundation (d9dc52cd remote) | **SUCCESS** | **Phase 2 foundation green.** Remote tree 387cc962 is byte-identical to local HEAD 0365fdf9's tree (mirror push verified). All steps passed (06:49→07:48 UTC): shared-core tests, app unit tests, APK build. App suite: 727 classes, **3,534 tests, 0 failures, 0 errors** (18 skipped) — Phase 1's 3,531 plus the new theme tests. The hand-computed contrast margins held: `MusicSpaceThemeTest` 8/8, `ThemeFontsTest` 2/2, `ThemePickerTest` 3/3, `ThemeApplierTest` 4/4, `ThemesTest` 5/5, `ResolvedFixtureTest` 2/2, all with 0 failures. APK verified: package `app.winters.octo.debug`, versionName `0.2.0-debug`, valid Android Debug signature (CI runner key), dex contains `MusicSpace` (15 refs), `ForestGlass`, and Phase 1's `DiscoverScreen`. Delivered as a NEW file `~/workspace/your_files/octo-player-debug/app-music-space-theme-debug.apk` (97,927,795 bytes); the Discover v1 APK is untouched (md5 57666872e96dd84f421b30f927d3f540). **Not yet device-tested — only Collin's phone test proves it works.** |
 
 ### Phase 2 foundation — Music Space theme (2026-11-20, Claude Code session, ~16 min)
 
@@ -90,6 +92,16 @@ Full write-up: `PHASE2-FOUNDATION-NOTES.md`.
 - New tests: MusicSpaceThemeTest, ThemeFontsTest; updated ThemesTest, ThemeApplierTest,
   ThemePickerTest, ResolvedFixtureTest. Contrast margins hand-computed; three are close
   to their thresholds — CI is the first real check.
+- **CI result (2026-11-20, coordinator follow-up):** the foundation commits were
+  mirror-pushed (remote tip d9dc52cd, tree identical to local) and run 44690480834 came
+  back **SUCCESS** — the flagged contrast margins all held, no theme-value fixes were
+  needed. APK delivered as `app-music-space-theme-debug.apk` (see CI runs table and APK
+  deliveries). Still outstanding from `PHASE2-FOUNDATION-NOTES.md`: the components round
+  (apply `LocalOctoFonts` in components, per-theme glass recipe, player-bar surface,
+  per-theme corner radius, sage fill-accent role) and bundling the real Playfair Display /
+  DM Sans font files. The theme is selectable and persists, but most screens do not read
+  the new type tokens yet — the visible change in this build is the palette, launch
+  screens and theme picker.
 
 ## Notes
 
@@ -110,6 +122,13 @@ Full write-up: `PHASE2-FOUNDATION-NOTES.md`.
   Note: CI debug builds are signed with the runner's debug key, which differs per run —
   installing over the stock baseline may require uninstalling the old debug build first
   (same lesson as the Solar app). A fixed debug keystore is a worthwhile follow-up.
+- **Phase 2 foundation (Music Space theme): `~/workspace/your_files/octo-player-debug/app-music-space-theme-debug.apk`**
+  — from run 44690480834 (feature/discover-v1 @ d9dc52cd remote), 97,927,795 bytes,
+  package app.winters.octo.debug, versionName 0.2.0-debug. The Discover v1 APK above
+  stays in place untouched as the fallback. Same per-run debug-key caveat: installing
+  this over the Discover build will likely require uninstalling the old debug build
+  first (which loses its local data — the theme build's Discover dismissals are not
+  backed up, see Phase 1 notes).
 
 ### Phase 1 — Discover v1 implemented (2026-11-19, Claude Code session, ~25 min)
 
