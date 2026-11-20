@@ -67,7 +67,13 @@ data class SongMenuContext(
     val selection: SongSelection? = null,
     val selectKey: String? = null,
     val fromPlayer: Boolean = false,
+    // Set where a song is a pick offered to the listener (Discover): the
+    // menu then ends with "Not interested", which hands the song here.
+    val onNotInterested: ((TrackEntity) -> Unit)? = null,
 )
+
+// The words of the "Not interested" row in a Discover pick's menu.
+const val NOT_INTERESTED = "Not interested"
 
 // What a song row can do without opening the menu: a swipe, or a screen
 // reader's actions. The menu's host fills it in, since it has the player.
@@ -146,7 +152,7 @@ val LocalSongMenu = staticCompositionLocalOf<SongMenuState> { error("No song men
 enum class SongAction {
     PlayNext, AddToQueue, StartRadio, Download, RequestCopy, AddToLastPlaylist, AddToPlaylist, RemoveFromPlaylist, Select, KeepOffline, FindFlac, ShareFile, Share, Like,
     Rate, GoToAlbum, GoToArtist, SetAsSound, DeleteFromPhone, RemoveFromMyLibrary, DeleteFromDisk, Info, FindSongs, TryAnotherVersion,
-    Cast, Sound,
+    Cast, Sound, NotInterested,
 }
 
 // Where the menu was opened, as the choices care about it.
@@ -212,6 +218,8 @@ fun songActions(
     streamVersions: Boolean = false,
     // The server keeps songs found online in playlists (octoPlaylistSongs).
     playlistAdds: Boolean = false,
+    // The song is a Discover pick, which can be turned down for good.
+    notInterested: Boolean = false,
 ): List<SongAction> = buildList {
     add(SongAction.PlayNext)
     add(SongAction.AddToQueue)
@@ -251,6 +259,7 @@ fun songActions(
     add(SongAction.Info)
     if (findSongs) add(SongAction.FindSongs)
     if (find && !owned && place.inPlayer && streamVersions) add(SongAction.TryAnotherVersion)
+    if (notInterested) add(SongAction.NotInterested)
     if (place.inPlayer) {
         add(SongAction.Cast)
         add(SongAction.Sound)
@@ -266,7 +275,7 @@ private val SongMenuOrder = listOf(
     listOf(SongAction.AddToLastPlaylist, SongAction.AddToPlaylist, SongAction.Like, SongAction.Rate, SongAction.Download, SongAction.RequestCopy, SongAction.KeepOffline, SongAction.FindFlac),
     listOf(SongAction.GoToAlbum, SongAction.GoToArtist),
     listOf(SongAction.Share, SongAction.ShareFile, SongAction.SetAsSound, SongAction.Info, SongAction.FindSongs, SongAction.TryAnotherVersion, SongAction.Select),
-    listOf(SongAction.RemoveFromPlaylist, SongAction.DeleteFromPhone, SongAction.RemoveFromMyLibrary, SongAction.DeleteFromDisk),
+    listOf(SongAction.RemoveFromPlaylist, SongAction.NotInterested, SongAction.DeleteFromPhone, SongAction.RemoveFromMyLibrary, SongAction.DeleteFromDisk),
     listOf(SongAction.Cast, SongAction.Sound),
 )
 

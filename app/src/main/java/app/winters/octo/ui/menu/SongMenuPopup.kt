@@ -198,6 +198,7 @@ private fun SongActionsPage(
         owned = trackId in LocalOwnedFinds.current,
         streamVersions = offersVersions && vm.playingEntry(trackId) != null,
         playlistAdds = vm.playlistAdds,
+        notInterested = context.onNotInterested != null,
     )
     // A family member whose songs are saved rather than added.
     val saves = vm.family.outside.addLabel != null
@@ -330,6 +331,11 @@ private fun SongActionsPage(
                     vm.playingEntry(trackId)?.let { entry ->
                         state.openVersions(VersionsSong(entry, trackId.removePrefix(FIND_PREFIX), song.title, song.artist))
                     }
+                })
+                // A Discover pick: never offered again (see DiscoverRepository).
+                SongAction.NotInterested -> GlassMenuAction(OctoIcons.Close, NOT_INTERESTED, onClick = {
+                    state.close()
+                    context.onNotInterested?.invoke(song)
                 })
                 SongAction.Cast -> CastAction(onClick = { state.pages.open(SongPage.Cast) })
                 SongAction.Sound -> {

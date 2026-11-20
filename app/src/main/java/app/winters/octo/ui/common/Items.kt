@@ -176,16 +176,16 @@ private fun AlbumCard(
 // A song as a picture with its title and artist under it, for rows of
 // songs. A tap plays; a long press opens the song's menu. A song found
 // online carries the not-in-library mark on its picture, and nothing more
-// by its artist.
+// by its artist. `menuContext` says where the card is, for its menu.
 @Composable
-fun SongCard(track: TrackEntity, onClick: () -> Unit) {
+fun SongCard(track: TrackEntity, onClick: () -> Unit, menuContext: SongMenuContext = SongMenuContext()) {
     val menu = LocalSongMenu.current
     val faint = isOutOfReach(track)
     Column(
         Modifier
             .width(150.dp)
             .alpha(if (faint) OutOfReachAlpha else 1f)
-            .pressOrHold(LocalHapticFeedback.current, LocalPressSpot.current, onClick) { menu.open(track.id) },
+            .pressOrHold(LocalHapticFeedback.current, LocalPressSpot.current, onClick) { menu.open(track.id, menuContext) },
     ) {
         ArtworkFill(track.artwork, outside = isOutsideLibrary(track.id))
         Spacer(Modifier.height(8.dp))
@@ -587,10 +587,11 @@ fun ArtistCircle(artist: ArtistEntity, onClick: () -> Unit) {
 }
 
 // An artist on the server, drawn the same way. Not in the library unless
-// said otherwise (`outside`), so with the not-in-library mark.
+// said otherwise (`outside`), so with the not-in-library mark. A long press
+// does `onLongClick`, when given (Discover's "Not interested").
 @Composable
-fun ArtistCircle(artist: OnlineArtist, outside: Boolean = true, onClick: () -> Unit) =
-    ArtistCircle(artist.artwork, artist.name, onClick, null, outside = outside)
+fun ArtistCircle(artist: OnlineArtist, outside: Boolean = true, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) =
+    ArtistCircle(artist.artwork, artist.name, onClick, onLongClick, outside = outside)
 
 @Composable
 private fun ArtistCircle(artwork: String?, name: String, onClick: () -> Unit, onLongClick: (() -> Unit)?, outside: Boolean) {
