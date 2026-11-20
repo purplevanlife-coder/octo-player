@@ -167,10 +167,10 @@ interface UserDao {
     @Query("SELECT t.* FROM liked_track l JOIN track t ON t.id = l.trackId ORDER BY l.likedAt DESC")
     fun likedTracks(): Flow<List<TrackEntity>>
 
-    // The newest `limit` liked songs, read once: a bounded take of
-    // likedTracks() for one-shot readers (Discover's seed signals) that
-    // only ever use the first few hundred and must not read the whole
-    // table (WholeTableGateTest).
+    // The newest `limit` liked songs, read once: a bounded take of the
+    // liked-songs flow for one-shot readers (Discover's seed signals)
+    // that only ever use the first few hundred and must not read the
+    // whole table (WholeTableGateTest).
     @Query("SELECT t.* FROM liked_track l JOIN track t ON t.id = l.trackId ORDER BY l.likedAt DESC LIMIT :limit")
     suspend fun likedTracksLimited(limit: Int): List<TrackEntity>
 
