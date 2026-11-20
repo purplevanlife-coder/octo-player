@@ -2,6 +2,7 @@ package app.winters.octo.ui.discover
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
@@ -151,8 +153,8 @@ fun DiscoverScreen(onOpen: (NavKey) -> Unit, vm: DiscoverViewModel = hiltViewMod
                 is DiscoverUi.Ready -> {
                     item(key = "updated") { UpdatedLine(shown.batch, shown.making) }
                     if (shown.batch.sections.isEmpty()) emptyNote(runsOcto)
-                    // The curated playlists head the tab; the rest follow as before.
-                    playlistGrid(shown.batch.sections.filter { it.kind == SectionKind.Playlist }) { openKey = it.key }
+                    // The curated playlists head the tab, as a carousel; the rest follow as before.
+                    playlistCarousel(shown.batch.sections.filter { it.kind == SectionKind.Playlist }) { openKey = it.key }
                     shown.batch.sections.forEach { section(it, vm, onOpen) }
                 }
             }
@@ -203,8 +205,11 @@ private fun RefreshButton(busy: Boolean, onClick: () -> Unit) {
     }
 }
 
-// The curated playlists, two tiles a row, under their own title.
-private fun LazyListScope.playlistGrid(playlists: List<DiscoverSection>, onOpen: (DiscoverSection) -> Unit) {
+// The curated playlists under their own title, as a carousel: one large
+// card at a time, its covers forward, the next card peeking at the edge,
+// each card snapping into place as it is swiped to. A tap opens the
+// playlist's page, as the tiles did before.
+private fun LazyListScope.playlistCarousel(playlists: List<DiscoverSection>, onOpen: (DiscoverSection) -> Unit) {
     if (playlists.isEmpty()) return
     item(key = "title:playlists") {
         Column(Modifier.padding(top = 18.dp)) {
@@ -217,18 +222,25 @@ private fun LazyListScope.playlistGrid(playlists: List<DiscoverSection>, onOpen:
             )
         }
     }
-    playlists.chunked(2).forEach { pair ->
-        item(key = "playlists:${pair.first().key}") {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 7.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                pair.forEach { PlaylistTile(it, Modifier.weight(1f)) { onOpen(it) } }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
+    item(key = "playlists:carousel") {
+        val state = rememberLazyListState()
+        LazyRow(
+            state = state,
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            flingBehavior = rememberSnapFlingBehavior(state),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(playlists, key = { it.key }) { playlist ->
+                PlaylistTile(playlist, Modifier.width(PlaylistCardWidth)) { onOpen(playlist) }
             }
         }
     }
 }
+
+// A carousel card's width: most of a phone's screen, so one card leads
+// and the next peeks in at the edge.
+private val PlaylistCardWidth = 272.dp
 
 // One playlist: a square of its first covers (four when it has four
 // different ones), its name, and its line.

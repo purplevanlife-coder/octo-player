@@ -95,8 +95,8 @@ private const val SIMILAR_SONG_SHARE = 0.6
 // strongest with a library id seed the chains), and how many of the
 // strongest artists known only from the listening history get a chain of
 // their own, through the server's artist of that name.
-private const val SEEDS_WEIGHED = 60
-private const val HISTORY_CHAINS = 3
+private const val SEEDS_WEIGHED = 150
+private const val HISTORY_CHAINS = 5
 
 // The listening history's songs are looked up by title this many keys at a time.
 private const val KEYS_AT_ONCE = 400

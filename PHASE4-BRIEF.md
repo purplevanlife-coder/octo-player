@@ -1,0 +1,147 @@
+# Phase 4 brief — bubble/pill rework + Discover top-1000, dedupe, carousel
+
+Branch `feature/discover-v1`. Collin device-tested Phase 3 on 2026-11-20 and gave six
+items. Everything stays behind the existing Music Space theme gate
+(`ThemeLayout` / `LocalActiveTheme`); the other five themes must be untouched.
+No Gradle locally — CI is the first full compile, so pure logic must be extracted
+and unit-tested, and Compose code kept conservative. Follow the codebase's
+comment style (plain, explanatory, no banned patterns — never write the literal
+whole-table DAO call text in comments; WholeTableGateTest scans raw text).
+
+## 1. Bubble resize is broken on-device — fix the gesture architecture
+
+Phase 3 shipped: two stacked `pointerInput`s on the bubble — `detectTapGestures`
+(tap + `onLongPress` → adjust row) outside `detectDragGestures` — plus, while
+adjusting, a full-screen scrim in `PointerEventPass.Initial` that consumes EVERY
+down. Coordinator's diagnosis (verify while you work, state your own finding in
+the notes): the scrim's Initial-pass consumption cancels the adjust chips'
+`detectTapGestures` (they require unconsumed downs), so − / + taps are dead;
+and the split tap/drag detectors make long-press fragile (any drift past slop
+becomes a drag and cancels the long-press wait).
+
+Required fix:
+- Replace the bubble's gesture stack with ONE `pointerInput` running a single
+  `awaitEachGesture` loop: classify each gesture deterministically as Tap,
+  LongPress, or Drag from (time held, distance moved, long-press timeout,
+  touch slop). Extract the classification into pure Kotlin
+  (`BubbleGesture` state machine in `BubbleMath.kt` or a sibling pure file)
+  driven by timestamped pointer events, and unit-test it in `BubbleMathTest`
+  (or a new `BubbleGestureTest`): quick tap → Tap; hold past timeout without
+  moving → LongPress exactly once, then further movement → Drag; move past
+  slop before timeout → Drag, never LongPress/Tap; release after drag → no Tap.
+- The adjust (resize) panel must NOT sit behind a consuming scrim. Options:
+  make the panel part of the same gesture target (chips are siblings inside
+  one parent Box that owns the single pointerInput), or drop the scrim and let
+  outside taps fall through to the page while a tap on the bubble toggles the
+  panel closed. Either way: chip taps must be ordinary, reliable clicks
+  (`clickable` or the same single-handler hit regions), the panel still closes
+  on bubble tap and after the quiet timeout, and no other control may be
+  starved by an Initial-pass consumer.
+- Keep: size bounds 48–128 dp, 12 dp steps, centre-keeping resize, position
+  persistence (`BubbleStore`, fractions + size), nothing-loaded shuffle play,
+  a11y actions (add Make bigger/smaller remain).
+
+## 2. Playing pill
+
+- When a song is loaded AND playing, the floating control expands from the
+  round bubble into a horizontal PILL: artwork disc at the left (its tap
+  opens the full player), then Previous, Play/Pause, Next buttons.
+  When paused or nothing is loaded it returns to the round bubble form
+  (empty state keeps shuffle-the-library play on tap).
+- Animate the width change (spring/`animateContentSize` or explicit width
+  animation) — no jarring jump; the artwork disc stays the anchor at the
+  pill's left edge so expansion grows rightward from the disc, and the whole
+  control stays clamped on screen in both forms.
+- Geometry: height = current bubble size (sizeDp). Pill width = height +
+  3 buttons; define it in pure math (`BubbleMath.pillWidthDp(sizeDp)` or
+  similar) and use the CURRENT form's footprint for travel/clamp/fraction
+  math, so dragging in pill form clamps by pill width and the persisted
+  fraction keeps it in the same screen region across form changes.
+- Buttons must be hit regions of the same single gesture handler (or
+  `clickable` children that consume their own touches): pressing Play/Pause
+  or Next must never start a drag or open the player. The gesture tests in
+  item 1 must cover: a down on a button region → button action only.
+  (If hit regions are decided in the single handler, pass the layout regions
+  in as pure data and test the routing function.)
+- Long-press adjust/resize still works in both forms; resize changes the
+  base size (disc height), the pill scales from it.
+
+## 3. Visibility ring
+
+- A deliberate border ring around the floating control in BOTH forms:
+  2 dp stroke in the Music Space cream (`ForestGlass.Text`) with the
+  existing downward shadow/elevation kept, so it reads against light art
+  and dark screens alike. The stroke follows the shape: circle on the
+  bubble, full-pill (stadium) shape on the pill. Not a glow/blur effect.
+  (The sage ring Phase 3 drew only while adjusting may stay as the adjust
+  indicator or be folded into this — the always-on cream ring is the new
+  requirement.)
+
+## 4. Discover — source from the top 1000
+
+- The bundled asset `app/src/main/assets/discover_takeout_seed.json` has
+  ALREADY been regenerated by the coordinator: version 2, top **1000**
+  artists / top **1000** tracks (title/artist/plays only; totals reconcile:
+  65,625 plays, 21,407 unique tracks, 6,825 unique artists). Do not
+  regenerate it.
+- Update `TakeoutSeedParseTest`: the bundled file now parses to 1000/1000.
+- Make Discover actually use the wider pool:
+  - `TakeoutSeed` weighting: raise the weighed-artist window from top 60 to
+    top 150 (log weighting unchanged).
+  - History-only (not-in-library) server chains: raise from top 3 to top 5.
+  - Track matching already scans the whole asset — confirm it now sees all
+    1000 tracks, and the history playlist pool with it.
+  - Note the extra server-call cost honestly in the notes.
+
+## 5. More playlists per batch + hard dedupe by artist and genre
+
+- Raise the batch from 12 playlists to **20** (1 pinned history + 19 from
+  the ring). Keep determinism, the generation/next-generation difference
+  guarantee (theme sets of g and g+1 differ), and the `previous` step-past.
+  Update `PlaylistsTest` counts accordingly.
+- HARD RULE: within one batch, no two playlists share a primary artist or a
+  genre/theme. Implement claims:
+  - Every candidate playlist claims a set of keys: `artist:<artistKey>` for
+    its primary artist (Because/Deep playlists: the seed artist; History:
+    the dominant artist of its songs — most frequent artist, stable
+    tie-break) and `genre:<genreKey>` for each genre it is based on (Lane
+    playlists claim their lane; Mood playlists claim EVERY constituent lane
+    genre; Fresh/Library/Sampler claim none beyond their family theme key
+    below).
+  - Every candidate also claims `theme:<family-or-template key>` so two
+    playlists of the same template family can't both appear (e.g. two
+    "Night drive"-style mood lists).
+  - Selection (in `choosePlaylists`) walks the ring as today but SKIPS any
+    candidate whose claim set intersects the already-selected sets; skipped
+    candidates are passed over for this generation (the ring walk continues
+    to later candidates so the batch still fills to 20 when the pool is
+    deep enough; if the pool runs dry the batch may be smaller — never
+    violate the rule to fill slots).
+  - Tests (`PlaylistsTest` additions): build inputs where two Because
+    playlists for the same artist, a Lane playlist and a Mood playlist
+    sharing a genre, and a History playlist whose dominant artist also has
+    a Because candidate all compete — assert the emitted batch has pairwise
+    disjoint claim sets; assert batch size reaches 20 with a deep pool;
+    assert generations still differ under dedupe.
+
+## 6. Discover playlists as a carousel
+
+- The "Playlists for you" section becomes a horizontal CAROUSEL: a
+  `LazyRow` of large playlist cards (cover mosaic forward, title +
+  explainer visible), card width ~ most of the viewport (≈ 78% or a fixed
+  ~280 dp — pick what reads well on a 412 dp phone) with
+  `rememberSnapFlingBehavior` so cards snap, and spacing/peek of the next
+  card. It leads the Discover tab as today.
+- Tapping a card opens the same playlist detail page as Phase 3 (Play /
+  Shuffle / Not-interested unchanged). Refresh stays in the header.
+  Cache-first rendering unchanged (the kept batch renders before any
+  refresh completes).
+- Other Discover sections below stay as they are.
+
+## Out of scope / keep intact
+
+- Circle player, ring seek, top bar, page swipe, Forest Glass theme,
+  discover.db (NO new migration unless unavoidable — if one is needed,
+  dismissals must survive with a migration test like Phase 3's).
+- BarShownTest counts and other source-scan tests: check them if you touch
+  MainShell/bubble call sites.

@@ -9,9 +9,12 @@ import org.junit.Test
 
 class PlaylistsTest {
     // Six seeds, each leading to fifteen artists with two songs apiece, the
-    // artists' genres turning through eight lanes; a few library songs
-    // among them; forty history songs and a rediscover pool.
-    private val lanes = listOf("Country", "Folk", "Indie", "Rock", "Phonk", "Electronic", "Soul", "Jazz")
+    // artists' genres turning through all fourteen lanes; a few library
+    // songs among them; forty history songs and a rediscover pool.
+    private val lanes = listOf(
+        "Country", "Folk", "Bluegrass", "Blues", "Indie", "Rock", "Phonk",
+        "Hip-Hop", "Electronic", "Soul", "Jazz", "Oldies", "Latin", "Reggae",
+    )
     private val seeds = (1..6).map { "Seed $it" }
 
     private val picks: List<Pick> = seeds.flatMapIndexed { s, seed ->
@@ -49,7 +52,47 @@ class PlaylistsTest {
     }
 
     @Test
-    fun aBatchShowsAtLeastTwelvePlaylistsEachWithEnoughSongs() {
+    fun noBatchHoldsTwoPlaylistsBasedOnTheSameMusicianOrGenre() {
+        for (generation in 0L..7L) {
+            val chosen = choosePlaylists(playlistCandidates(input, generation), generation)
+            // Every pair's claims are disjoint: no shared musician, genre
+            // or template between any two playlists in the batch.
+            for ((i, a) in chosen.withIndex()) {
+                for (b in chosen.drop(i + 1)) {
+                    assertTrue("${a.theme} meets ${b.theme} in generation $generation", a.claims.intersect(b.claims).isEmpty())
+                }
+            }
+            // In particular: a seed's Because and Deep cuts never share a
+            // batch, and no lane finds list shares its genre with a mood
+            // mix in the batch.
+            val themes = chosen.mapTo(HashSet()) { it.theme }
+            for (seed in seeds) {
+                val key = artistKey(seed)
+                assertFalse("generation $generation", "because:$key" in themes && "deep:$key" in themes)
+            }
+            val moodGenres = chosen.filter { it.family == PlaylistFamily.Mood }.flatMap { it.claims }.filter { it.startsWith("genre:") }.toSet()
+            val laneGenres = chosen.filter { it.family == PlaylistFamily.Lane }.flatMap { it.claims }.filter { it.startsWith("genre:") }.toSet()
+            assertTrue("generation $generation", moodGenres.intersect(laneGenres).isEmpty())
+        }
+    }
+
+    @Test
+    fun theHistoryPlaylistsDominantArtistBlocksThatArtistsBecause() {
+        // The history's songs are mostly one of the seeds: that seed's
+        // Because playlist exists among the candidates, but the history
+        // playlist claims the artist first, so it cannot share the batch.
+        val mostlySeedOne = (1..16).map { song("lib:hs$it", "His $it", "Seed 1") } +
+            (1..8).map { song("lib:ho$it", "Other $it", "Someone Else $it") }
+        val withHistory = input.copy(history = mostlySeedOne)
+        val candidates = playlistCandidates(withHistory, 0)
+        assertTrue(candidates.any { it.theme == "because:${artistKey("Seed 1")}" })
+        val chosen = choosePlaylists(candidates, 0).mapTo(HashSet()) { it.theme }
+        assertTrue("history" in chosen)
+        assertFalse("because:${artistKey("Seed 1")}" in chosen)
+    }
+
+    @Test
+    fun aBatchShowsTwentyPlaylistsEachWithEnoughSongs() {
         for (generation in 0L..7L) {
             val playlists = buildPlaylists(input, generation)
             assertEquals(PLAYLISTS_SHOWN, playlists.size)

@@ -1,25 +1,31 @@
 package app.winters.octo.ui.nav
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,8 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUpOrCanceled
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -46,6 +53,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import app.winters.octo.design.BarGlass
@@ -56,6 +64,7 @@ import app.winters.octo.player.rememberPositionMs
 import app.winters.octo.theme.ForestGlass
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
 // What the bubble's touches do, on the same calls as the bar's round button.
@@ -68,23 +77,44 @@ class BubbleActions(
     val onKeep: (BubblePlace) -> Unit,
 )
 
-// Music Space's now-playing button, free of the bar: the round artwork with
-// its progress ring (NowPlayingFace, as on the bar), floating over the pages
-// wherever it was last left.
+// The control's shape and size on screen, in pixels, as the gesture
+// handler needs them: the room it moves in, its own footprint in the form
+// it is in now, and the disc's width within it.
+private data class BubbleGeo(
+    val areaW: Float,
+    val areaH: Float,
+    val margin: Float,
+    val widthPx: Float,
+    val heightPx: Float,
+    val discPx: Float,
+    val pill: Boolean,
+)
+
+// Music Space's now-playing control, free of the bar: the round artwork
+// with its progress ring (NowPlayingFace, as on the bar), floating over
+// the pages wherever it was last left. A cream ring runs round it in
+// every form, so it reads against light artwork and dark pages alike.
 //
-// - A tap opens the full player. With nothing loaded it shows the play sign
-//   and a tap shuffles the library, as the bar's round button does.
-// - A drag moves it; it stays where it is dropped, kept on screen with a
-//   margin, and the place is kept as fractions of the screen.
-// - A long press opens its adjust row beside it: smaller, play or pause,
-//   bigger. A tap anywhere else (or a few quiet seconds) closes the row.
-//   That tap is taken by the row's closing, so it never lands on the page.
+// - While a song plays it opens into a pill: the disc at the left (its
+//   tap opens the full player) and Previous, Play/Pause and Next beside
+//   it. Paused, or with nothing loaded, it is the round bubble again;
+//   with nothing loaded it shows the play sign and a tap shuffles the
+//   library, as the bar's round button does.
+// - A drag on the disc moves it; it stays where it is dropped, kept on
+//   screen with a margin, and the place is kept as fractions of the
+//   screen. Dragging never opens the player or presses a button.
+// - A long press on the disc opens its adjust row beside it: smaller,
+//   play or pause, bigger. A tap on the disc (or a few quiet seconds)
+//   closes the row.
 //
-// A drag that moves past the touch slop is never a tap: the drag consumes
-// the touch, which cancels the tap and the long press, so moving the bubble
-// never opens the player or toggles playback. Touches anywhere off the
-// bubble reach the page under it (overlapping siblings do not share touches
-// in Compose), so the pages still scroll and swipe round it.
+// Every touch is read by ONE handler that feeds BubbleGestureMachine, and
+// the adjust row's buttons are plain clicks with nothing spread over the
+// screen in front of them. Phase 3 ran two detectors side by side plus a
+// full-screen layer that swallowed every touch while the row was open —
+// the layer ate the row's own buttons, so resizing never worked on a
+// phone. Touches anywhere off the control reach the page under it
+// (overlapping siblings do not share touches in Compose), so the pages
+// still scroll and swipe round it.
 @Composable
 fun NowPlayingBubble(
     haze: HazeState,
@@ -98,12 +128,19 @@ fun NowPlayingBubble(
     val haptics = LocalHapticFeedback.current
     val current by rememberUpdatedState(actions)
     val hasSong = now.trackId != null
-    // What is shown: the kept place, or while it is being changed, what the
-    // finger has made of it (so a drop never jumps back while it is stored).
-    var shown by remember { mutableStateOf(place) }
+    // The pill only while a song is actually sounding; the moment it
+    // pauses, the control settles back to the round bubble.
+    val pill = hasSong && now.isPlaying
+    // What is shown: the kept place, or while it is being changed, what
+    // the finger has made of it (so a drop never jumps back while it is
+    // stored).
+    val shownState = remember { mutableStateOf(place) }
+    var shown by shownState
     LaunchedEffect(place) { shown = place }
-    var drag by remember { mutableStateOf<Offset?>(null) }
-    var adjusting by remember { mutableStateOf(false) }
+    val dragState = remember { mutableStateOf<Offset?>(null) }
+    var drag by dragState
+    val adjustingState = remember { mutableStateOf(false) }
+    var adjusting by adjustingState
     // The adjust row closes itself after a few quiet seconds.
     LaunchedEffect(adjusting, shown.sizeDp) {
         if (adjusting) {
@@ -115,19 +152,30 @@ fun NowPlayingBubble(
     val position = rememberPositionMs(now, positionMs, everyMs = RingStepMs)
     val progress = { now.fractionAt(position.longValue) }
 
+    val sizeDp = BubbleMath.clampSize(shown.sizeDp)
+    // The width breathes between the disc and the pill; the disc stays
+    // anchored at the left, so the pill grows out of it to the right.
+    val widthDp by animateDpAsState(
+        BubbleMath.formWidthDp(sizeDp, pill).dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "nowPlayingWidth",
+    )
+    val shape: Shape = if (pill) RoundedCornerShape(percent = 50) else CircleShape
+
     BoxWithConstraints(modifier.fillMaxSize().windowInsetsPadding(BubbleInsets)) {
         val areaW = constraints.maxWidth.toFloat()
         val areaH = constraints.maxHeight.toFloat()
         val margin = with(density) { BubbleMath.MARGIN_DP.dp.toPx() }
-        val sizeDp = BubbleMath.clampSize(shown.sizeDp)
         val sizePx = with(density) { sizeDp.dp.toPx() }
+        val widthPx = with(density) { widthDp.toPx() }
         val rest = Offset(
-            BubbleMath.offsetOf(shown.x, areaW, sizePx, margin),
+            BubbleMath.offsetOf(shown.x, areaW, widthPx, margin),
             BubbleMath.offsetOf(shown.y, areaH, sizePx, margin),
         )
         val corner = drag ?: rest
+        val geo by rememberUpdatedState(BubbleGeo(areaW, areaH, margin, widthPx, sizePx, sizePx, pill))
         val latestRest by rememberUpdatedState(rest)
-        val geometry by rememberUpdatedState(Triple(areaW, areaH, sizePx))
+        val hasSongNow by rememberUpdatedState(hasSong)
 
         fun keep(next: BubblePlace) {
             shown = next
@@ -138,82 +186,98 @@ fun NowPlayingBubble(
             val newSize = BubbleMath.stepped(sizeDp, bigger)
             if (newSize == sizeDp) return
             val newPx = with(density) { newSize.dp.toPx() }
-            val x = BubbleMath.resizedOffset(rest.x, sizePx, newPx, areaW, margin)
+            val newWidth = with(density) { BubbleMath.formWidthDp(newSize, pill).dp.toPx() }
+            val x = BubbleMath.resizedOffset(rest.x, widthPx, newWidth, areaW, margin)
             val y = BubbleMath.resizedOffset(rest.y, sizePx, newPx, areaH, margin)
-            keep(BubblePlace(BubbleMath.fractionOf(x, areaW, newPx, margin), BubbleMath.fractionOf(y, areaH, newPx, margin), newSize))
-        }
-
-        // While adjusting, a touch anywhere off the bubble and its row only
-        // closes the row.
-        if (adjusting) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(pass = PointerEventPass.Initial)
-                            down.consume()
-                            adjusting = false
-                            do {
-                                val event = awaitPointerEvent(PointerEventPass.Initial)
-                                event.changes.forEach { it.consume() }
-                            } while (event.changes.any { it.pressed })
-                        }
-                    }
-                    .semantics { contentDescription = "Close the bubble's adjust buttons" },
-            )
+            keep(BubblePlace(BubbleMath.fractionOf(x, areaW, newWidth, margin), BubbleMath.fractionOf(y, areaH, newPx, margin), newSize))
         }
 
         Box(
             Modifier
                 .offset { IntOffset(corner.x.roundToInt(), corner.y.roundToInt()) }
-                .size(sizeDp.dp)
-                // Outside the drag in the chain, so the drag sees each move
-                // first and, once it consumes it, the tap is cancelled.
-                .pointerInput(hasSong) {
-                    detectTapGestures(
-                        onTap = {
-                            if (adjusting) {
-                                adjusting = false
-                            } else if (hasSong) {
-                                current.onOpenPlayer()
-                            } else {
-                                current.onPlayPause()
-                            }
-                        },
-                        onLongPress = {
-                            if (hasSong) {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                adjusting = true
-                            }
-                        },
-                    )
-                }
+                .width(widthDp)
+                .height(sizeDp.dp)
+                // The one touch handler. It reads the live geometry and
+                // state through their holders, so it never restarts
+                // mid-gesture when the pill breathes or the place lands.
                 .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { drag = latestRest },
-                        onDragEnd = {
-                            val (w, h, s) = geometry
-                            drag?.let { dropped ->
-                                keep(shown.copy(x = BubbleMath.fractionOf(dropped.x, w, s, margin), y = BubbleMath.fractionOf(dropped.y, h, s, margin)))
+                    val machine = BubbleGestureMachine(viewConfiguration.longPressTimeoutMillis, viewConfiguration.touchSlop)
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val g = geo
+                        val region = BubbleMath.regionAt(down.position.x, down.position.y, g.widthPx, g.heightPx, g.discPx, g.pill)
+                        fun handle(events: List<BubbleGestureEvent>) {
+                            for (event in events) {
+                                when (event) {
+                                    is BubbleGestureEvent.Tap -> when (event.region) {
+                                        BubbleRegion.Art -> {
+                                            if (adjustingState.value) {
+                                                adjustingState.value = false
+                                            } else if (hasSongNow) {
+                                                current.onOpenPlayer()
+                                            } else {
+                                                current.onPlayPause()
+                                            }
+                                        }
+                                        BubbleRegion.Previous -> current.onPrevious()
+                                        BubbleRegion.PlayPause -> current.onPlayPause()
+                                        BubbleRegion.Next -> current.onNext()
+                                    }
+                                    BubbleGestureEvent.LongPress -> if (hasSongNow) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        adjustingState.value = true
+                                    }
+                                    BubbleGestureEvent.DragStart -> dragState.value = latestRest
+                                    is BubbleGestureEvent.Drag -> {
+                                        val gg = geo
+                                        val from = dragState.value ?: latestRest
+                                        dragState.value = Offset(
+                                            BubbleMath.clampOffset(from.x + event.dx, gg.areaW, gg.widthPx, gg.margin),
+                                            BubbleMath.clampOffset(from.y + event.dy, gg.areaH, gg.heightPx, gg.margin),
+                                        )
+                                    }
+                                    BubbleGestureEvent.DragEnd, BubbleGestureEvent.DragCancel -> {
+                                        val gg = geo
+                                        dragState.value?.let { dropped ->
+                                            keep(
+                                                shownState.value.copy(
+                                                    x = BubbleMath.fractionOf(dropped.x, gg.areaW, gg.widthPx, gg.margin),
+                                                    y = BubbleMath.fractionOf(dropped.y, gg.areaH, gg.heightPx, gg.margin),
+                                                ),
+                                            )
+                                        }
+                                        dragState.value = null
+                                    }
+                                }
                             }
-                            drag = null
-                        },
-                        onDragCancel = {
-                            val (w, h, s) = geometry
-                            drag?.let { dropped ->
-                                keep(shown.copy(x = BubbleMath.fractionOf(dropped.x, w, s, margin), y = BubbleMath.fractionOf(dropped.y, h, s, margin)))
+                        }
+                        handle(machine.down(region, down.position.x, down.position.y, down.uptimeMillis))
+                        // Only a disc touch can long-press; a button touch
+                        // just waits for its release.
+                        var awaitingLongPress = region == BubbleRegion.Art
+                        var lastMs = down.uptimeMillis
+                        var done = false
+                        while (!done) {
+                            val event = if (awaitingLongPress) {
+                                withTimeoutOrNull((down.uptimeMillis + viewConfiguration.longPressTimeoutMillis - lastMs).coerceAtLeast(1)) { awaitPointerEvent() }
+                            } else {
+                                awaitPointerEvent()
                             }
-                            drag = null
-                        },
-                    ) { change, amount ->
-                        change.consume()
-                        val (w, h, s) = geometry
-                        val from = drag ?: latestRest
-                        drag = Offset(
-                            BubbleMath.clampOffset(from.x + amount.x, w, s, margin),
-                            BubbleMath.clampOffset(from.y + amount.y, h, s, margin),
-                        )
+                            if (event == null) {
+                                awaitingLongPress = false
+                                handle(machine.timeout(down.uptimeMillis + viewConfiguration.longPressTimeoutMillis))
+                                continue
+                            }
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: continue
+                            lastMs = change.uptimeMillis
+                            if (change.changedToUpOrCanceled()) {
+                                handle(machine.up(change.uptimeMillis))
+                                done = true
+                            } else {
+                                handle(machine.move(change.position.x, change.position.y, change.uptimeMillis))
+                            }
+                            change.consume()
+                        }
                     }
                 }
                 .semantics {
@@ -235,33 +299,47 @@ fun NowPlayingBubble(
                     }
                 },
         ) {
-            BarGlass(haze, Modifier.matchParentSize(), shape = CircleShape, topDocked = true) {
-                Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
-                    NowPlayingFace(now, progress, size = sizeDp.dp)
-                    // A song with no artwork shows a note in its circle, as
-                    // the full player's does, never an empty hole.
-                    if (hasSong && now.artwork == null) {
-                        Icon(
-                            painterResource(OctoIcons.Songs),
-                            contentDescription = null,
-                            tint = Color(ForestGlass.Dim).copy(alpha = 0.6f),
-                            modifier = Modifier.size(sizeDp.dp * 0.36f),
-                        )
+            BarGlass(haze, Modifier.matchParentSize(), shape = shape, topDocked = true) {
+                Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(sizeDp.dp), contentAlignment = Alignment.Center) {
+                        NowPlayingFace(now, progress, size = sizeDp.dp)
+                        // A song with no artwork shows a note in its circle, as
+                        // the full player's does, never an empty hole.
+                        if (hasSong && now.artwork == null) {
+                            Icon(
+                                painterResource(OctoIcons.Songs),
+                                contentDescription = null,
+                                tint = Color(ForestGlass.Dim).copy(alpha = 0.6f),
+                                modifier = Modifier.size(sizeDp.dp * 0.36f),
+                            )
+                        }
+                    }
+                    if (pill) {
+                        val buttonWidth = BubbleMath.pillButtonDp(sizeDp).dp
+                        PillButton(OctoIcons.Previous, "Previous", buttonWidth)
+                        PillButton(OctoIcons.Pause, "Pause", buttonWidth)
+                        PillButton(OctoIcons.Next, "Next", buttonWidth)
                     }
                 }
             }
-            if (adjusting) {
-                Box(Modifier.matchParentSize().border(2.dp, Color(ForestGlass.Accent2), CircleShape))
-            }
+            // The ring that keeps it visible on any ground: cream, all the
+            // way round, in whichever form it is in. While the adjust row
+            // is open it turns sage, the theme's adjusting colour.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .border(2.dp, Color(if (adjusting) ForestGlass.Accent2 else ForestGlass.Text), shape),
+            )
         }
 
         if (adjusting) {
-            // The row beside the bubble: above it in the lower half of the
-            // screen, under it in the upper half, held on screen.
+            // The row beside the control: above it in the lower half of
+            // the screen, under it in the upper half, held on screen, and
+            // centred on the control as it lies now.
             val rowW = with(density) { (AdjustChipSize * 3 + AdjustGap * 2).toPx() }
             val rowH = with(density) { AdjustChipSize.toPx() }
             val gap = with(density) { AdjustGap.toPx() }
-            val x = (corner.x + sizePx / 2 - rowW / 2).coerceIn(margin, (areaW - rowW - margin).coerceAtLeast(margin))
+            val x = (corner.x + widthPx / 2 - rowW / 2).coerceIn(margin, (areaW - rowW - margin).coerceAtLeast(margin))
             val above = corner.y - gap - rowH
             val y = if (shown.y > 0.5f && above >= 0f) above else corner.y + sizePx + gap
             Row(
@@ -271,14 +349,27 @@ fun NowPlayingBubble(
             ) {
                 AdjustChip(OctoIcons.Close, "Make the bubble smaller", enabled = sizeDp > BubbleMath.MIN_SIZE_DP, glyph = "−") { resize(bigger = false) }
                 AdjustChip(if (now.isPlaying) OctoIcons.Pause else OctoIcons.Play, if (now.isPlaying) "Pause" else "Play", enabled = true) { current.onPlayPause() }
-                AdjustChip(OctoIcons.AddToLibrary, "Make the bubble bigger", enabled = sizeDp < BubbleMath.MAX_SIZE_DP) { resize(bigger = true) }
+                AdjustChip(OctoIcons.AddToLibrary, "Make the bubble bigger", enabled = sizeDp < BubbleMath.MAX_SIZE_DP, glyph = null) { resize(bigger = true) }
             }
         }
     }
 }
 
+// One of the playing pill's transport buttons. It draws only: the
+// control's one touch handler reads the region a touch lands in
+// (BubbleMath.regionAt) and presses the button, so a press can never
+// start a drag or open the player by accident.
+@Composable
+private fun PillButton(@DrawableRes icon: Int, description: String, width: Dp) {
+    Box(Modifier.width(width).fillMaxHeight(), contentAlignment = Alignment.Center) {
+        Icon(painterResource(icon), contentDescription = description, tint = Color(ForestGlass.Text), modifier = Modifier.size(26.dp))
+    }
+}
+
 // A round button in the bubble's adjust row. `glyph` draws a plain minus in
-// place of the icon (there is no minus icon in the set).
+// place of the icon (there is no minus icon in the set). A plain click —
+// nothing is spread over the screen in front of it (Phase 3's swallowing
+// layer is what left these dead on the phone).
 @Composable
 private fun AdjustChip(@DrawableRes icon: Int, description: String, enabled: Boolean, glyph: String? = null, onPress: () -> Unit) {
     Box(
@@ -286,17 +377,7 @@ private fun AdjustChip(@DrawableRes icon: Int, description: String, enabled: Boo
             .size(AdjustChipSize)
             .background(Color(ForestGlass.PlayerBar), CircleShape)
             .border(1.dp, Color(ForestGlass.GlassEdge), CircleShape)
-            .pointerInput(enabled) { if (enabled) detectTapGestures(onTap = { onPress() }) }
-            .semantics {
-                role = Role.Button
-                contentDescription = description
-                if (enabled) {
-                    onClick {
-                        onPress()
-                        true
-                    }
-                }
-            },
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = description) { onPress() },
         contentAlignment = Alignment.Center,
     ) {
         val tint = Color(ForestGlass.Text).copy(alpha = if (enabled) 1f else 0.35f)

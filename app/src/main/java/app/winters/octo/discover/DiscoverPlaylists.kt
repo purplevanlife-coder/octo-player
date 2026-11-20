@@ -13,7 +13,7 @@ import app.winters.octo.catalog.TrackEntity
 
 // How many playlists a batch shows when it has that many themes to choose
 // from, and how many songs a playlist needs to be shown at all.
-const val PLAYLISTS_SHOWN = 12
+const val PLAYLISTS_SHOWN = 20
 const val PLAYLIST_MIN = 8
 
 // A playlist's usual size, the listening history's (a longer list), and
@@ -47,14 +47,37 @@ data class PlaylistInput(
 )
 
 // A playlist that can be made: its theme (the same in every generation),
-// kind, name, honest one-line explainer and songs.
+// kind, name, honest one-line explainer and songs. `claims` is what the
+// playlist is based on — the musician it centres on, the genres it draws
+// from, its own template — and a batch never holds two playlists whose
+// claims meet (see choosePlaylists).
 data class PlaylistCandidate(
     val theme: String,
     val family: PlaylistFamily,
     val title: String,
     val subtitle: String,
     val songs: List<TrackEntity>,
+    val claims: Set<String> = emptySet(),
 )
+
+// The artist a playlist's songs come back to most (the listening
+// history's headline artist, say), ties broken by the artist's key so
+// every run agrees. Null for an empty list.
+internal fun dominantArtistKey(songs: List<TrackEntity>): String? =
+    songs.groupingBy { artistKey(it.artist) }.eachCount().entries
+        .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+        .firstOrNull()?.key
+
+// The genre lane a strict majority of a playlist's songs fall in, when
+// one does: the genre the playlist can fairly be said to be based on.
+internal fun majorityGenreKey(songs: List<TrackEntity>): String? {
+    if (songs.isEmpty()) return null
+    val lanes = songs.mapNotNull { laneOf(it.genre.ifEmpty { null }, it.year) }
+    val top = lanes.groupingBy { it }.eachCount().entries
+        .sortedWith(compareByDescending<Map.Entry<DiscoverLane, Int>> { it.value }.thenBy { it.key.name })
+        .firstOrNull() ?: return null
+    return if (top.value * 2 > songs.size) "genre:${top.key.name}" else null
+}
 
 // A playlist section's key: its theme and the generation it was made in.
 fun playlistKey(theme: String, generation: Long): String = "pl:$theme#g$generation"
@@ -106,18 +129,27 @@ fun playlistCandidates(input: PlaylistInput, generation: Long): List<PlaylistCan
         .sortedWith(byStrength)
         .filter { seen.add(songKey(it.track)) }
     val out = ArrayList<PlaylistCandidate>()
-    fun add(theme: String, family: PlaylistFamily, title: String, subtitle: String, songs: List<TrackEntity>) {
-        if (songs.size >= PLAYLIST_MIN) out += PlaylistCandidate(theme, family, title, subtitle, songs)
+    fun add(theme: String, family: PlaylistFamily, title: String, subtitle: String, songs: List<TrackEntity>, claims: Set<String>) {
+        if (songs.size >= PLAYLIST_MIN) out += PlaylistCandidate(theme, family, title, subtitle, songs, claims)
     }
 
-    // The listening history's songs, in their play order.
+    // The listening history's songs, in their play order. It claims the
+    // artist its songs come back to most, and the genre a majority of
+    // them fall in when one does, so no other playlist in the batch is
+    // based on that musician or that genre either.
     val history = ownSongs(input.history, dismissed)
+    val historySongs = turned(history, 4, HISTORY_PLAYLIST_SIZE, generation, keepOrder = true)
     add(
         "history",
         PlaylistFamily.History,
         "From your listening history",
         "The songs you've played most over the years, from your library",
-        turned(history, 4, HISTORY_PLAYLIST_SIZE, generation, keepOrder = true),
+        historySongs,
+        buildSet {
+            add("theme:history")
+            dominantArtistKey(historySongs)?.let { add("artist:$it") }
+            majorityGenreKey(historySongs)?.let { add(it) }
+        },
     )
 
     // Because you play (and, with enough left over, Deep cuts) for the strongest seeds.
@@ -128,7 +160,7 @@ fun playlistCandidates(input: PlaylistInput, generation: Long): List<PlaylistCan
         val because = turned(pool, PLAYLIST_PER_ARTIST, PLAYLIST_SIZE, generation)
         if (because.size < PLAYLIST_MIN) continue
         val line = if (key in input.historySeeds) "Artists like $seed, from your listening history" else "Songs from artists like $seed"
-        add("because:$key", PlaylistFamily.Because, "Because you play $seed", line, because)
+        add("because:$key", PlaylistFamily.Because, "Because you play $seed", line, because, setOf("theme:because:$key", "artist:$key"))
         val taken = because.mapTo(HashSet()) { it.id }
         deep += Triple(key, seed, turned(pool.filter { it.id !in taken }, PLAYLIST_PER_ARTIST, PLAYLIST_SIZE, generation))
     }
@@ -139,6 +171,7 @@ fun playlistCandidates(input: PlaylistInput, generation: Long): List<PlaylistCan
         "Heavy rotation, rediscovered",
         "Other songs by the artists you play most",
         turned(ownSongs(input.rediscover, dismissed), 4, PLAYLIST_SIZE, generation),
+        setOf("theme:rediscover"),
     )
     add(
         "fresh",
@@ -146,18 +179,33 @@ fun playlistCandidates(input: PlaylistInput, generation: Long): List<PlaylistCan
         "Fresh finds",
         "Songs new to your library, from along your chains",
         turned(picks.filter { it.outside }.map { it.track }, PLAYLIST_PER_ARTIST, PLAYLIST_SIZE, generation),
+        setOf("theme:fresh"),
     )
 
     val byLane = picks.groupBy { laneOf(it.genre ?: it.track.genre.ifEmpty { null }, it.year ?: it.track.year) }
     for (mood in Moods) {
         val pool = picks.filter { laneOf(it.genre ?: it.track.genre.ifEmpty { null }, it.year ?: it.track.year) in mood.lanes }.map { it.track }
-        add("mood:${mood.id}", PlaylistFamily.Mood, mood.title, mood.subtitle, turned(pool, PLAYLIST_PER_ARTIST, PLAYLIST_SIZE, generation))
+        // A mood mix claims every genre it mixes, so a batch never pairs
+        // it with a finds list (or another mix) based on one of them.
+        add(
+            "mood:${mood.id}",
+            PlaylistFamily.Mood,
+            mood.title,
+            mood.subtitle,
+            turned(pool, PLAYLIST_PER_ARTIST, PLAYLIST_SIZE, generation),
+            buildSet {
+                add("theme:mood:${mood.id}")
+                mood.lanes.forEach { add("genre:${it.name}") }
+            },
+        )
     }
     for (lane in DiscoverLane.entries) {
         val pool = byLane[lane].orEmpty().map { it.track }
-        add("lane:${lane.name}", PlaylistFamily.Lane, "${lane.title} finds", "${lane.title} from along your chains", turned(pool, 3, PLAYLIST_SIZE, generation))
+        add("lane:${lane.name}", PlaylistFamily.Lane, "${lane.title} finds", "${lane.title} from along your chains", turned(pool, 3, PLAYLIST_SIZE, generation), setOf("theme:lane:${lane.name}", "genre:${lane.name}"))
     }
-    for ((key, seed, songs) in deep) add("deep:$key", PlaylistFamily.Deep, "Deep cuts: $seed", "Further along the chain from $seed", songs)
+    for ((key, seed, songs) in deep) {
+        add("deep:$key", PlaylistFamily.Deep, "Deep cuts: $seed", "Further along the chain from $seed", songs, setOf("theme:deep:$key", "artist:$key"))
+    }
 
     add(
         "library",
@@ -165,6 +213,7 @@ fun playlistCandidates(input: PlaylistInput, generation: Long): List<PlaylistCan
         "Already in your library",
         "Your own songs that your chains lead back to",
         turned(picks.filterNot { it.outside }.map { it.track }, PLAYLIST_PER_ARTIST, PLAYLIST_SIZE, generation),
+        setOf("theme:library"),
     )
     add(
         "sampler",
@@ -172,19 +221,25 @@ fun playlistCandidates(input: PlaylistInput, generation: Long): List<PlaylistCan
         "One from each",
         "One song from each artist along your chains",
         turned(picks.map { it.track }, 1, PLAYLIST_SIZE, generation),
+        setOf("theme:sampler"),
     )
     return out
 }
 
 // Which playlists a batch of `generation` shows, in the candidates' order.
 // The `pinned` kinds always show (the listening history, the tab's
-// headline). The rest stand in a ring that takes the kinds in turns, so
-// any stretch of it mixes them, and each generation shows the stretch
-// after the last one's: generation n starts at n × the free slots. So when
-// there are more playlists than slots, generation n + 1 never shows the
-// same set as generation n; and should what was gathered have changed so
-// that it would anyway (`previous`, the themes the batch being replaced
-// showed), the stretch moves on until it does not.
+// headline) and claim what they are based on first. The rest stand in a
+// ring that takes the kinds in turns, so any stretch of it mixes them,
+// and each generation starts further round it: generation n starts at
+// n × the free slots. A candidate is only ever taken when none of its
+// claims (the musician or genre it is based on, its template) is already
+// claimed by a playlist taken before it — so a batch never holds two
+// playlists based on the same musician or the same genre, even when that
+// leaves a slot empty because the ring ran dry. When there are more
+// playlists than slots, generation n + 1 never shows the same set as
+// generation n; and should what was gathered have changed so that it
+// would anyway (`previous`, the themes the batch being replaced showed),
+// the start moves on until it does not.
 fun choosePlaylists(
     candidates: List<PlaylistCandidate>,
     generation: Long,
@@ -193,25 +248,66 @@ fun choosePlaylists(
     pinned: Set<PlaylistFamily> = setOf(PlaylistFamily.History),
 ): List<PlaylistCandidate> {
     val place = candidates.withIndex().associate { (i, c) -> c.theme to i }
-    val fixed = candidates.filter { it.family in pinned }.take(shown)
+    val fixed = candidates.filter { it.family in pinned }
     val ring = inTurnsByFamily(candidates.filter { it.family !in pinned })
-    val slots = shown - fixed.size
-    val picked = if (ring.size <= slots) {
-        ring
-    } else {
-        val fixedThemes = fixed.mapTo(HashSet()) { it.theme }
-        fun stretch(start: Int) = (0 until slots).map { ring[(start + it) % ring.size] }
-        var start = Math.floorMod((generation % ring.size) * slots, ring.size.toLong()).toInt()
-        var window = stretch(start)
-        var moves = 0
-        while (previous.isNotEmpty() && moves < ring.size && window.mapTo(HashSet(fixedThemes)) { it.theme } == previous) {
-            start = (start + 1) % ring.size
-            window = stretch(start)
-            moves++
+
+    // The batch a walk of the ring from `start` makes: the pinned first,
+    // then the ring in its turns, each candidate taken only while a slot
+    // is free and its claims are all still unclaimed. `banned` themes are
+    // passed over entirely (the repair below uses it).
+    fun fill(start: Int, banned: Set<String> = emptySet()): List<PlaylistCandidate> {
+        val picked = ArrayList<PlaylistCandidate>()
+        val claimed = HashSet<String>()
+        fun offer(candidate: PlaylistCandidate) {
+            if (picked.size >= shown) return
+            if (candidate.theme in banned) return
+            if (candidate.claims.any { it in claimed }) return
+            picked += candidate
+            claimed += candidate.claims
         }
-        window
+        fixed.forEach(::offer)
+        if (ring.isNotEmpty()) {
+            var walked = 0
+            while (picked.size < shown && walked < ring.size) {
+                offer(ring[(start + walked) % ring.size])
+                walked++
+            }
+        }
+        return picked
     }
-    return (fixed + picked).sortedBy { place.getValue(it.theme) }
+
+    // A greedy walk can leave slots empty behind one wide-claiming
+    // playlist (a mood mix claims every genre it mixes, and taken early
+    // it can keep out three finds lists). So a short batch is repaired:
+    // try trading each playlist it holds (never a pinned one) for
+    // whatever its claims were keeping out, and keep any trade that
+    // fills more of the batch. Every accepted trade fills at least one
+    // more slot, so this settles quickly, and it never trades into a
+    // claims clash — the refill makes the same checks as any walk.
+    fun repaired(start: Int): List<PlaylistCandidate> {
+        var best = fill(start)
+        var rounds = 0
+        while (best.size < shown && rounds < shown) {
+            rounds++
+            val trial = best.filter { it.family !in pinned }
+                .firstNotNullOfOrNull { victim -> fill(start, banned = setOf(victim.theme)).takeIf { it.size > best.size } }
+                ?: break
+            best = trial
+        }
+        return best
+    }
+
+    if (ring.isEmpty()) return fill(0).sortedBy { place.getValue(it.theme) }
+    val slots = (shown - fixed.size).coerceAtLeast(1)
+    var start = Math.floorMod((generation % ring.size) * slots, ring.size.toLong()).toInt()
+    var picked = repaired(start)
+    var moves = 0
+    while (previous.isNotEmpty() && moves < ring.size && picked.mapTo(HashSet()) { it.theme } == previous) {
+        start = (start + 1) % ring.size
+        picked = repaired(start)
+        moves++
+    }
+    return picked.sortedBy { place.getValue(it.theme) }
 }
 
 // The batch's playlist sections for `generation`.

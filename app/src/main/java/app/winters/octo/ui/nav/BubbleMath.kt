@@ -63,6 +63,38 @@ object BubbleMath {
     // A bigger or smaller bubble, by one step, within its bounds.
     fun stepped(sizeDp: Float, bigger: Boolean): Float = clampSize(sizeDp + if (bigger) STEP_DP else -STEP_DP)
 
+    // While a song plays, the bubble opens into a pill: the artwork disc
+    // (the bubble's own size) plus three transport buttons beside it. A
+    // button is three quarters of the disc across, held between a finger's
+    // minimum and a size that keeps the pill from spanning the screen.
+    const val PILL_BUTTON_MIN_DP = 44f
+    const val PILL_BUTTON_MAX_DP = 64f
+    const val PILL_BUTTONS = 3
+
+    fun pillButtonDp(sizeDp: Float): Float = (clampSize(sizeDp) * 0.75f).coerceIn(PILL_BUTTON_MIN_DP, PILL_BUTTON_MAX_DP)
+
+    // The pill's whole width: the disc and its buttons.
+    fun pillWidthDp(sizeDp: Float): Float = clampSize(sizeDp) + PILL_BUTTONS * pillButtonDp(sizeDp)
+
+    // The control's width in the form it is in: the disc alone, or the pill.
+    fun formWidthDp(sizeDp: Float, pill: Boolean): Float = if (pill) pillWidthDp(sizeDp) else clampSize(sizeDp)
+
+    // Which part of the control a touch at (`x`, `y`) lands on, the control
+    // being `widthPx` by `heightPx` with its disc `discPx` across at the
+    // left. Off the disc in the round form, everything is the disc; in the
+    // pill the rest splits into the three buttons in order. A touch outside
+    // the control at all still reads as the disc, so a stray edge touch can
+    // never fire a transport button.
+    fun regionAt(x: Float, y: Float, widthPx: Float, heightPx: Float, discPx: Float, pill: Boolean): BubbleRegion {
+        if (!pill || x < discPx || x >= widthPx || y < 0f || y >= heightPx) return BubbleRegion.Art
+        val band = (widthPx - discPx) / PILL_BUTTONS
+        return when (((x - discPx) / band).toInt().coerceIn(0, PILL_BUTTONS - 1)) {
+            0 -> BubbleRegion.Previous
+            1 -> BubbleRegion.PlayPause
+            else -> BubbleRegion.Next
+        }
+    }
+
     // Resized about its centre: the corner that keeps the bubble's centre
     // where it was, then kept on screen.
     fun resizedOffset(offset: Float, oldSize: Float, newSize: Float, area: Float, margin: Float): Float =

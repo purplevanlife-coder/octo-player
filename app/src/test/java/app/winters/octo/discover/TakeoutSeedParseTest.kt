@@ -38,8 +38,8 @@ class TakeoutSeedParseTest {
         val file = File(File(System.getProperty("octo.mainSources")!!).parentFile, "assets/$TAKEOUT_SEED_FILE")
         val text = file.readText()
         val seed = parseTakeoutSeed(text)
-        assertEquals(300, seed.artists.size)
-        assertEquals(500, seed.tracks.size)
+        assertEquals(1000, seed.artists.size)
+        assertEquals(1000, seed.tracks.size)
         assertTrue(seed.artists.zipWithNext().all { (a, b) -> a.plays >= b.plays })
         assertFalse("no links in the seed", text.contains("http") || text.contains("youtube.com/watch") || text.contains("\"url\""))
     }
