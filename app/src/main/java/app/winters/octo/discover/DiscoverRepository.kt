@@ -343,7 +343,7 @@ class DiscoverRepository @Inject constructor(
         }.orEmpty()
         val recent = safely("recent") { withTimeoutOrNull(SIGNALS_WAIT_MS) { history.recentPlays(RECENT_READ).first() } }.orEmpty()
         val likedArtists = safely("liked artists") { favourites.likedArtists().first() }.orEmpty()
-        val likedSongs = safely("liked songs") { users.likedTracks().first() }.orEmpty().take(LIKED_READ)
+        val likedSongs = safely("liked songs") { users.likedTracksLimited(LIKED_READ) }.orEmpty()
         val rated = safely("rated") { catalog.topRatedTracks(RATED_FROM, RATED_READ) }.orEmpty()
         return SeedSignals(
             plays = played.map { ref(it.track) to it.plays },

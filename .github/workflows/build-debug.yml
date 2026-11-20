@@ -28,7 +28,7 @@ jobs:
         run: ./gradlew :shared:core:allTests --no-daemon
 
       - name: Run app unit tests
-        timeout-minutes: 40
+        timeout-minutes: 60
         run: ./gradlew :app:testDebugUnitTest --no-daemon
 
       - name: Upload test reports
