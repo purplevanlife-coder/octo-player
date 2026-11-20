@@ -300,17 +300,24 @@ private val byPick = compareByDescending<Pick> { it.outside }.thenByDescending {
 
 // The picks in their order, at most `perArtist` from any one artist, taken
 // in turns so no artist's songs bunch up at the front, at most `size`.
+// Songs not in the library all come before library songs, each group
+// taking its own turns (the per-artist count is shared).
 internal fun spread(picks: List<Pick>, perArtist: Int, size: Int): List<Pick> {
-    val rounds = ArrayList<MutableList<Pick>>()
     val counts = HashMap<String, Int>()
-    for (pick in picks) {
-        val n = counts[pick.artist] ?: 0
-        if (n >= perArtist) continue
-        counts[pick.artist] = n + 1
-        while (rounds.size <= n) rounds += ArrayList<Pick>()
-        rounds[n] += pick
+    fun turns(group: List<Pick>): List<Pick> {
+        val rounds = ArrayList<MutableList<Pick>>()
+        for (pick in group) {
+            val n = counts[pick.artist] ?: 0
+            if (n >= perArtist) continue
+            counts[pick.artist] = n + 1
+            val round = n.coerceAtMost(perArtist - 1)
+            while (rounds.size <= round) rounds += ArrayList<Pick>()
+            rounds[round] += pick
+        }
+        return rounds.flatten()
     }
-    return rounds.flatten().take(size)
+    val (outside, inside) = picks.partition { it.outside }
+    return (turns(outside) + turns(inside)).take(size)
 }
 
 // A batch as shown once some picks are turned down: they leave every
