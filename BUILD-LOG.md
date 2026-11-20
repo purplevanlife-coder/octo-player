@@ -58,6 +58,39 @@ Started: 2026-11-19 (America/Los_Angeles).
 | 44678219131 | feature/discover-v1 | + gate fix (18d9662e remote) | **failure** | Shared tests passed; app suite ran to completion inside the 60-min cap: 726 classes / 3,531 tests, still exactly one failure — the gate moved to `UserDao.kt`: it scans raw text, and the explanatory comment on the new DAO method contained the literal whole-table call text, tripping the "streams now" rule for that file. Fixed by rewording the comment; a local simulation of the gate (its own regexes/sets run over the source tree) then reported zero callers and zero violations. |
 | 44683285029 | feature/discover-v1 | + comment fix (609d9a1a remote) | **SUCCESS** | **Phase 1 green.** Shared-core tests passed; app suite: 726 classes, **3,531 tests, 0 failures, 0 errors** (18 skipped); debug APK built and uploaded. APK verified as the fork build: package `app.winters.octo.debug`, versionName `0.2.0-debug`, and the dex contains the Discover classes (`DiscoverScreen`, 81 references to `app/winters/octo/discover` in classes18.dex). Delivered to `~/workspace/your_files/octo-player-debug/app-debug.apk` (97,926,559 bytes), replacing the stock baseline. **Not yet device-tested — only Collin's phone test proves it works.** |
 
+### Phase 2 foundation — Music Space theme (2026-11-20, Claude Code session, ~16 min)
+
+Per Collin's overnight instruction (2026-11-19 ~22:35): with Discover green and the APK
+made, go straight into the UI phase. Five commits (1672a2fa…587812e6), +510/−7, 17 files.
+Full write-up: `PHASE2-FOUNDATION-NOTES.md`.
+
+- **Music Space is a sixth theme** (`ThemeChoice.MusicSpace`, dark), appended after Octo,
+  Moss, Dusk, Daylight, Paper; selectable in Settings → Appearance, persists by enum name,
+  fills the night slot under Match. The existing five are unchanged (ordinals, names,
+  colours; the colour-snapshot fixture still pins only the original five).
+- **Palette from theme.css "Forest Glass"**, single source `ForestGlass.kt`. Adaptations
+  the token system forced: surfaces must be solid, so the glass colours are composited
+  (card #23291E, raised #2F3529); the theme accent is the light sage #AEBFA5 because the
+  darker sage #7D9168 fails the 4.5:1 contrast rule on card/raised surfaces (kept for
+  filled pills in the components round); amber → complement (stars/hearts), warm tan →
+  third colour, hairline border exact, sheets use the near-opaque player-bar olive.
+- **Type tokens** (`OctoFonts`/`LocalOctoFonts`) added; existing themes name no face, so
+  their text is unchanged. No component reads the tokens yet — applying them is the next
+  round. Font files are NOT bundled (download needed approval in the coder sandbox):
+  Music Space currently uses the system serif + bundled Inter Display; the notes give the
+  exact drop-in file names for Playfair Display / DM Sans. Caveat skipped — the app has
+  no handwritten-text slot.
+- **Picker fix:** at 2× text size "Music Space" can't fit its card whole; names that
+  overflow now step their size down (floor 0.6×), names that fit are untouched, with a
+  test pinning the existing five at full size.
+- **Not expressible per-theme today** (recorded in ForestGlass.kt + notes): translucent
+  surfaces, soft colour variants, the 18dp radius, the blur/glass recipe, the type scale,
+  and the danger red #F0927F — the error colour is shared by all Octo apps, so changing
+  it needs a deliberate decision, not a theme tweak.
+- New tests: MusicSpaceThemeTest, ThemeFontsTest; updated ThemesTest, ThemeApplierTest,
+  ThemePickerTest, ResolvedFixtureTest. Contrast margins hand-computed; three are close
+  to their thresholds — CI is the first real check.
+
 ## Notes
 
 - **Push route:** plain `git push` has no credential path on this VM. Commits are
