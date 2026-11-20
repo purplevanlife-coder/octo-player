@@ -41,7 +41,7 @@ class PlayerUpdaterTest {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 calls += request
                 val path = request.url.encodedPath
-                if (path == "/repos/winters27/octo/releases") return listAnswer(request)
+                if (path == "/repos/purplevanlife-coder/octo-player/releases") return listAnswer(request)
                 val name = request.url.pathSegments.last()
                 val bytes = served(name) ?: return MockResponse.Builder().code(404).build()
                 return MockResponse.Builder().body(okio.Buffer().write(bytes)).build()
