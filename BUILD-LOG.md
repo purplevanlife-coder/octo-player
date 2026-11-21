@@ -62,6 +62,11 @@ Started: 2026-11-19 (America/Los_Angeles).
 | 44802066138 | feature/discover-v1 | Phase 3 (a5f6235e remote) | **failure** | Compile error only: duplicate `TimesRoom` (CirclePlayer vs LivePlayerParts). Shared-core tests passed. Fixed by rename to `RingTimesRoom`. |
 | 44803775878 | feature/discover-v1 | + TimesRoom fix (ba0dbc4a remote) | **failure** | Runner infrastructure: Compose Gradle plugin artifact could not be resolved from the plugin repository; failed in 18 s before compiling. No code change; re-dispatched unchanged. |
 | 44803983093 | feature/discover-v1 | (same tree) | **SUCCESS** | **Phase 3 green.** Shared-core + app suites: **6,456 tests, 0 failures, 0 errors** (18 skipped). APK delivered as `app-music-space-player-debug.apk` (98,687,705 bytes); see the Phase 3 section. |
+| 44818647041 | feature/discover-v1 | Phase 4 (8b987332 remote) | **failure** | Compile error only: `changedToUpOrCanceled` unresolved — removed in this Compose version. Fixed by reading the release from the change's `pressed` state (0270018b remote). |
+| 44820558060 | feature/discover-v1 | + pressed-state fix (0270018b remote) | **failure** | Compiled; app suite 3,617 tests with exactly 2 failures, both upstream concurrency tests untouched by the diff: `TotalsReadHoldTest`, `LeaveStopsBuildsTest`. Judged flakes; re-dispatched unchanged. |
+| 44829046266 | feature/discover-v1 | (same tree) | **failure** | Same pattern, different test: 1 failure, `MixThreadingTest` (threading). Re-dispatched unchanged. |
+| 44836232252 | feature/discover-v1 | (same tree) | **failure** | Same pattern again: 1 failure, `LikedHiddenRaceTest` (the same race test that flaked in the Phase 2 components round). Re-dispatched unchanged. |
+| 44842767691 | feature/discover-v1 | (same tree) | **SUCCESS** | **Phase 4 green.** Shared-core + app suites: **6,469 tests, 0 failures, 0 errors** (18 skipped). APK delivered as `app-music-space-player2-debug.apk` (98,736,597 bytes); see the Phase 4 section. |
 
 ### Phase 2 foundation — Music Space theme (2026-11-20, Claude Code session, ~16 min)
 
@@ -218,6 +223,62 @@ Collin's requests (2026-11-20 ~10:34–10:41 PST), six items in one round. Brief
   build, and on-phone checks of ring/artwork gestures, bubble tap-vs-drag,
   shelf-vs-page swipe feel, and the top bar over the Home header.
 
+### Phase 4 — bubble/pill rework, Discover top-1000 + dedupe + carousel (2026-11-20, coordinator-written)
+
+Collin device-tested Phase 3 and gave six items in one round. Brief:
+`PHASE4-BRIEF.md`; full write-up: `PHASE4-NOTES.md`. Claude Code was at its
+5-hour cap, so the coordinator wrote and reviewed the code directly; pure
+logic was verified in local kotlinc harnesses (Discover 50/50, bubble 20/20)
+before CI. Two local commits: 57ef0842 (the round) + 93e492a8 (compile fix).
+
+1. **Bubble resize fixed by replacing the gesture architecture.** Phase 3's
+   two stacked `pointerInput`s plus the adjust-mode scrim (consuming every
+   down in `PointerEventPass.Initial`) made the − / + chips' `detectTapGestures`
+   dead and let drift cancel the long-press. Phase 4: ONE `pointerInput`
+   feeding a pure `BubbleGestureMachine` (Tap / LongPress / Drag classified
+   from timestamped events, unit-tested), chips as plain `clickable`s, scrim
+   removed. Bounds 48–128 dp, 12 dp steps, `BubbleStore` persistence
+   unchanged.
+2. **Playing pill:** loaded + playing → the bubble expands (spring-animated,
+   disc anchored left) into a pill with Previous / Play-Pause / Next as
+   draw-only regions of the same gesture handler — a button touch can only
+   ever be that button's tap, never a drag or a player-open. Paused/empty →
+   round bubble, empty state keeps shuffle-the-library play. Geometry in
+   `BubbleMath` (60 dp disc → 195 dp pill).
+3. **Visibility ring:** always-on 2 dp Music Space cream stroke following
+   the shape (circle → stadium), sage while adjusting, over the existing
+   shadow. A border, not a glow.
+4. **Top-1000 seeds:** asset regenerated to version 2 (top 1000 artists /
+   top 1000 tracks, 96,707 bytes, totals reconcile 65,625 / 21,407 /
+   6,825); weighed window top 60 → 150 artists, history-only server chains
+   top 3 → 5, track matching scans all 1000.
+5. **20 playlists per batch with hard dedupe:** every candidate claims
+   `theme:` / `artist:` / `genre:` keys (history claims its dominant artist;
+   moods claim every constituent lane genre); selection takes only
+   claim-disjoint candidates, pinned history first, plus a repair pass that
+   trades non-pinned playlists to fill slots without ever violating
+   disjointness. Next-generation guarantee holds (tested, generations 0–7).
+6. **Carousel:** "Playlists for you" is a snapping `LazyRow` of 272 dp
+   cards (existing `PlaylistTile`); detail page, Play/Shuffle,
+   Not-interested and Refresh unchanged; cache-first rendering unchanged.
+
+- **CI result:** five runs (see table). Run 1 failed to compile
+  (`changedToUpOrCanceled` removed in this Compose version; fixed via the
+  change's `pressed` state). Runs 2–4 each failed on 1–2 rotating upstream
+  concurrency tests (`TotalsReadHoldTest`, `LeaveStopsBuildsTest`,
+  `MixThreadingTest`, `LikedHiddenRaceTest`) — none in code this diff
+  touches; the same flake pattern as the components round. **44842767691
+  SUCCESS: 6,469 tests, 0 failures, 0 errors** (18 skipped) — Phase 3's
+  6,456 plus 13 net new (BubbleGestureTest, PlaylistsTest dedupe/batch,
+  TakeoutSeedParseTest 1000/1000). APK verified: package
+  `app.winters.octo.debug`, versionName `0.2.0-debug`, aapt2 + apksigner
+  verified, seed asset read back from inside the APK at 1000/1000, dex
+  contains BubbleGestureMachine, NowPlayingBubble, DiscoverPlaylists,
+  TakeoutSeed, CirclePlayer. Delivered as `app-music-space-player2-debug.apk`
+  (see APK deliveries). No discover.db change — dismissals untouched.
+  **Not yet device-tested — only Collin's phone test proves the pill/bubble
+  gestures.**
+
 ## Notes
 
 - **Push route:** plain `git push` has no credential path on this VM. Commits are
@@ -259,6 +320,17 @@ Collin's requests (2026-11-20 ~10:34–10:41 PST), six items in one round. Brief
   components build will likely require uninstalling it first (which loses that
   build's local Discover dismissals). The fork still has NO fixed keystore —
   setting one up remains a worthwhile follow-up (Collin's call).
+- **Phase 4 (bubble gesture machine + playing pill + ring, Discover
+  top-1000 seeds, 20 deduped playlists, carousel):
+  `~/workspace/your_files/octo-player-debug/app-music-space-player2-debug.apk`**
+  — from run 44842767691 (feature/discover-v1 @ 0270018b remote), 98,736,597
+  bytes, SHA-256 82ddd953e340d2ea17b2f02b0f099fa362b6a62aa03d343c401d8b4f15e8a040,
+  package app.winters.octo.debug, versionName 0.2.0-debug, aapt2 + apksigner
+  verified, seed asset v2 confirmed inside at 1000 artists / 1000 tracks.
+  Earlier APKs stay in place untouched. Same per-run debug-key caveat:
+  installing over the Phase 3 build will likely require uninstalling it
+  first (which loses that build's local Discover dismissals). The fork
+  still has NO fixed keystore.
 
 ### Phase 1 — Discover v1 implemented (2026-11-19, Claude Code session, ~25 min)
 
