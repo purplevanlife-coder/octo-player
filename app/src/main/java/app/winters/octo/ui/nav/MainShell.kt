@@ -183,8 +183,8 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
     val changingTab = tabSeen[0] != selected
     SideEffect { tabSeen[0] = selected }
     val motion = motionScale()
-    // Music Space docks the bar at the top, floats the now-playing bubble
-    // and turns the tab pages by a swipe; every other theme keeps Octo's
+    // Music Space docks the tab bar at the top, docks a player bar at the
+    // bottom and turns the tab pages by a swipe; every other theme keeps Octo's
     // shell exactly (ShellLayout).
     val shell = shellLayoutFor(LocalActiveTheme.current)
     val topDocked = shell.dock == BarDock.Top
@@ -349,19 +349,6 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
         onNext = playback::next,
     )
 
-    // The bubble's kept place, and what its touches do: a tap opens the
-    // player, or with nothing loaded shuffles the library, as the round
-    // button's does.
-    val bubbles = hiltViewModel<BubbleViewModel>()
-    val bubblePlace by bubbles.place.collectAsStateWithLifecycle()
-    val bubbleActions = BubbleActions(
-        onOpenPlayer = { playerOpen = true },
-        onPlayPause = playback::togglePlayPause,
-        onNext = playback::next,
-        onPrevious = playback::previous,
-        onKeep = bubbles::keep,
-    )
-
     // Access can be changed in system settings while the app is away.
     LifecycleResumeEffect(Unit) {
         library.refresh()
@@ -485,20 +472,20 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
                         selected = if (shell.swipePages) PagerSync.barTab(selected, pager.currentPage, fingerTurning) else selected,
                         now = now,
                         positionMs = playback::positionMs,
-                        playerShown = barPlayer && hasTrack && !shell.floatingNowPlaying,
+                        playerShown = barPlayer && hasTrack && !shell.bottomPlayerBar,
                         actions = barActions,
                         artModifier = Modifier.sharedElement(rememberSharedContentState(ArtKey), this),
                         artShape = RoundedCornerShape(percent = corner),
                         film = barFilm.value,
                         marks = if (serverUpdateWaits) mapOf(stacks.lastIndex to SERVER_UPDATE_MARK) else emptyMap(),
                         dock = shell.dock,
-                        nowPlaying = !shell.floatingNowPlaying,
+                        nowPlaying = !shell.bottomPlayerBar,
                     )
                 }
                 // Songs on their way: a small pill above the bar, on the
                 // right, that opens the server downloads sheet when tapped.
-                // With the bar at the top it sits low on the left instead, clear
-                // of the bubble's first place on the right.
+                // With the tab bar at the top it sits low on the left instead,
+                // just above Music Space's player bar.
                 AnimatedVisibility(
                     visible = barShown(playerOpen, stack.lastOrNull()),
                     enter = fadeIn(tween(300)),
@@ -506,28 +493,41 @@ fun MainShell(library: DeviceLibrary, playback: PlaybackConnection, feedback: Fe
                     modifier = Modifier.align(if (topDocked) Alignment.BottomStart else Alignment.BottomEnd),
                 ) {
                     if (topDocked) {
-                        DownloadsPill(haze, Modifier.navigationBarsPadding().padding(start = 20.dp, bottom = BarBottomGap))
+                        DownloadsPill(
+                            haze,
+                            Modifier.navigationBarsPadding().padding(
+                                start = 20.dp,
+                                bottom = if (shell.bottomPlayerBar) BarBottomGap + PlayerBarHeight + 10.dp else BarBottomGap,
+                            ),
+                        )
                     } else {
                         DownloadsPill(haze, Modifier.navigationBarsPadding().padding(end = 20.dp, bottom = BarBottomGap + BarHeight + 10.dp))
                     }
                 }
-                // Music Space's now-playing bubble, free over the pages. It shows
-                // and hides with the bar, and once its kept place is read.
-                if (shell.floatingNowPlaying) {
+                // Music Space's player bar, docked at the bottom of every page:
+                // the everyday control, showing and hiding with the tab bar. The
+                // pages already keep TopDockedBottomRoom (88 dp) clear at the
+                // bottom under this shell, and the bar takes 64 + 14 dp of it.
+                if (shell.bottomPlayerBar) {
                     AnimatedVisibility(
                         visible = barShown(playerOpen, stack.lastOrNull()),
                         enter = fadeIn(tween(300)),
                         exit = fadeOut(tween(300)),
+                        modifier = Modifier.align(Alignment.BottomCenter),
                     ) {
-                        bubblePlace?.let { place ->
-                            NowPlayingBubble(
-                                haze = haze,
-                                now = now,
-                                positionMs = playback::positionMs,
-                                place = place,
-                                actions = bubbleActions,
-                            )
-                        }
+                        BottomPlayerBar(
+                            haze = haze,
+                            now = now,
+                            positionMs = playback::positionMs,
+                            actions = PlayerBarActions(
+                                onOpenPlayer = { playerOpen = true },
+                                onPlayPause = playback::togglePlayPause,
+                                onNext = playback::next,
+                                onPrevious = playback::previous,
+                            ),
+                            artModifier = Modifier.sharedElement(rememberSharedContentState(ArtKey), this),
+                            artShape = RoundedCornerShape(PlayerArtCorner),
+                        )
                     }
                 }
                 AnimatedVisibility(

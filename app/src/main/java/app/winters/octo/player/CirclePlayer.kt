@@ -118,7 +118,7 @@ import kotlin.math.sin
 //
 // In lyrics mode (`folded`) it folds away like the upright player: the
 // circle fades, and the blocks fade to `shown` and take no touches, all
-// staying laid out so the artwork can still fly back to the bubble.
+// staying laid out so the artwork can still fly back to the player bar.
 @Composable
 internal fun AnimatedVisibilityScope.CirclePlayer(
     now: NowPlaying,

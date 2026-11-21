@@ -15,21 +15,23 @@ enum class PlayerLayout { Upright, Circle }
 enum class BarDock { Bottom, Top }
 
 // The shell's arrangement: where the tab bar docks, whether the now-playing
-// button floats free of the bar as a bubble, and whether the five tab pages
-// turn by a sideways swipe as well as by the bar.
+// control leaves the tab bar to become a player bar of its own docked at the
+// bottom of the screen, and whether the five tab pages turn by a sideways
+// swipe as well as by the bar.
 data class ShellLayout(
     val dock: BarDock,
-    val floatingNowPlaying: Boolean,
+    val bottomPlayerBar: Boolean,
     val swipePages: Boolean,
 )
 
 // Octo's own shell: the bar at the bottom with its round now-playing button,
 // tabs changed by the bar only.
-val ClassicShell = ShellLayout(dock = BarDock.Bottom, floatingNowPlaying = false, swipePages = false)
+val ClassicShell = ShellLayout(dock = BarDock.Bottom, bottomPlayerBar = false, swipePages = false)
 
-// Music Space: the tab bar at the top, the now-playing bubble free to move,
-// and the pages turned by a swipe.
-val MusicSpaceShell = ShellLayout(dock = BarDock.Top, floatingNowPlaying = true, swipePages = true)
+// Music Space: the tab bar at the top, the now-playing control a player bar
+// docked at the bottom (artwork, song, Previous / Play-Pause / Next and a
+// progress line), and the pages turned by a swipe.
+val MusicSpaceShell = ShellLayout(dock = BarDock.Top, bottomPlayerBar = true, swipePages = true)
 
 fun shellLayoutFor(theme: ThemeChoice): ShellLayout = if (theme == ThemeChoice.MusicSpace) MusicSpaceShell else ClassicShell
 

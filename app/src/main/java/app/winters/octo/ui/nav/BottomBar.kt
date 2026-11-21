@@ -134,8 +134,8 @@ class BarActions(
 // now-playing button, or, once that button is tapped, the tabs folded into
 // one circle and the button grown into a small player. Under Music Space's
 // shell it docks at the top (`dock`), below the status bar, and the
-// now-playing button leaves it (`nowPlaying` false) to float as the bubble:
-// the tabs then take the bar's whole width, with the same icons, order,
+// now-playing button leaves it (`nowPlaying` false) for the player bar
+// docked at the bottom (BottomPlayerBar): the tabs then take the bar's whole width, with the same icons, order,
 // destinations and gliding pill.
 @Composable
 fun BottomBar(

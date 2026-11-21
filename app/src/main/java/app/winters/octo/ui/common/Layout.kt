@@ -23,7 +23,7 @@ import app.winters.octo.design.displayType
 
 // Content starts below the status bar and ends above the floating bar.
 // Where the tab bar is docked at the top (Music Space), content starts below
-// it instead, and the bottom keeps only the room the floating bubble needs.
+// it instead, and the bottom keeps only the room the bottom player bar needs.
 @Composable
 fun screenPadding(extraTop: Dp = 0.dp): PaddingValues {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -42,8 +42,9 @@ val LocalTopBarRoom = staticCompositionLocalOf { 0.dp }
 fun topBarRoom(): Dp = LocalTopBarRoom.current
 
 // What a page keeps clear at its bottom, past the navigation bar: the
-// floating bar's room, or with the bar at the top only enough for the last
-// row to scroll clear of the now-playing bubble in its first place.
+// floating bar's room, or with the tab bar at the top only enough for the
+// last row to scroll clear of the player bar docked at the bottom (64 dp
+// bar + 14 dp gap, inside these 88).
 fun screenBottomRoom(topDocked: Boolean): Dp = if (topDocked) TopDockedBottomRoom else BottomBarRoom
 
 val BottomBarRoom = 120.dp

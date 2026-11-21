@@ -15,17 +15,17 @@ class ThemeLayoutTest {
             val shell = shellLayoutFor(theme)
             assertSame(theme.name, ClassicShell, shell)
             assertEquals(theme.name, BarDock.Bottom, shell.dock)
-            assertEquals(theme.name, false, shell.floatingNowPlaying)
+            assertEquals(theme.name, false, shell.bottomPlayerBar)
             assertEquals(theme.name, false, shell.swipePages)
         }
     }
 
     @Test
-    fun musicSpaceDocksTheBarAtTheTopFloatsTheBubbleAndSwipes() {
+    fun musicSpaceDocksTheTabBarAtTheTopThePlayerBarAtTheBottomAndSwipes() {
         val shell = shellLayoutFor(ThemeChoice.MusicSpace)
         assertSame(MusicSpaceShell, shell)
         assertEquals(BarDock.Top, shell.dock)
-        assertEquals(true, shell.floatingNowPlaying)
+        assertEquals(true, shell.bottomPlayerBar)
         assertEquals(true, shell.swipePages)
     }
 

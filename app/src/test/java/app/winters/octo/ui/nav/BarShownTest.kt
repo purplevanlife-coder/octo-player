@@ -29,13 +29,13 @@ class BarShownTest {
 
     // Red when a page that draws the sign-in screen is missing from the set
     // (its bar would show over it), a bar site (the bar, the downloads pill,
-    // the bubble) stops reading the rule, or a
+    // Music Space's player bar) stops reading the rule, or a
     // sign-in page pushed under the full player stays under it.
     @Test
     fun everySignInPageIsInTheSetAndBothSitesReadIt() {
         val drawn = Regex("""entry<(\w+)> \{[^\n]*SignInScreen\(""").findAll(shell).map { it.groupValues[1] }.toSet()
         assertEquals(signInRoutes.keys, drawn)
-        // The bar, the downloads pill and Music Space's now-playing bubble.
+        // The bar, the downloads pill and Music Space's bottom player bar.
         assertEquals(3, Regex(Regex.escape("visible = barShown(playerOpen, stack.lastOrNull()),")).findAll(shell).count())
         assertFalse(shell.contains("visible = !playerOpen,"))
         assertTrue(shell.contains("LaunchedEffect(top) { if (isSignInRoute(top)) playerOpen = false }"))

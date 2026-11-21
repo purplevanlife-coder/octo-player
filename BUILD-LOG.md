@@ -279,6 +279,37 @@ before CI. Two local commits: 57ef0842 (the round) + 93e492a8 (compile fix).
   **Not yet device-tested — only Collin's phone test proves the pill/bubble
   gestures.**
 
+### Phase 5 — bottom player bar, bubble retired (2026-11-21, Claude Code session)
+
+Collin rejected the circle player as the everyday control (2026-11-20 ~18:00
+PST: "I just want [the player] to be down at the bottom... skip pause
+whatever") and approved Muse's docked-bar design. Brief: `PHASE5-BRIEF.md`;
+full write-up: `PHASE5-NOTES.md`. Gradle not run (cannot work on this VM).
+
+1. **ShellLayout:** `floatingNowPlaying` → `bottomPlayerBar`
+   (`ClassicShell` false, `MusicSpaceShell` true). Other themes unchanged.
+2. **New `BottomPlayerBar` (`ui/nav/PlayerBar.kt`):** PlayerCapsule widened
+   into a 64 dp bar docked at the bottom under Music Space — 44 dp artwork
+   (casting mark, no-art note), title/artist marquee, Previous /
+   Play-Pause / Next (station controls mirror PlayerCapsule), whole-bar tap
+   opens the full player, 2.5 dp sage progress line along the top edge read
+   in the draw phase (500 ms steps redraw only the line), no line for a
+   station or nothing loaded (`playerBarShowsProgress`). Empty state:
+   "Shuffle your library" + Play, tap shuffles.
+3. **Bubble retired:** NowPlayingBubble, BubbleGesture, BubbleMath,
+   BubbleStore and their two test files deleted; MainShell's bubble view
+   model/actions/block removed.
+4. **Downloads pill** (top-docked shell) lifted above the player bar;
+   classic placement untouched. Page bottom room unchanged (88 dp covers
+   the bar's 78 dp).
+5. **Full player unchanged** by decision: circle player under Music Space
+   upright, all Phase 3/4 functionality intact.
+
+- **Tests:** ThemeLayoutTest updated; new PlayerBarTest (3 tests);
+  BubbleGestureTest/BubbleMathTest removed with their code.
+- **CI result:** pending CI.
+- **APK delivery:** pending CI.
+
 ## Notes
 
 - **Push route:** plain `git push` has no credential path on this VM. Commits are
