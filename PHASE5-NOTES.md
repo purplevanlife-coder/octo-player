@@ -2,7 +2,10 @@
 
 Branch `feature/discover-v1`. Brief: `PHASE5-BRIEF.md`. Code written by
 Claude Code on 2026-11-21; Gradle cannot run on this VM, so CI is the
-check. **CI result: pending CI. APK delivery: pending CI.**
+check. **CI result: run 44854313870 SUCCESS, first run — 6,452 tests,
+0 failures, 0 errors (18 skipped)**, counted from the run's test reports
+(1,071 suites across the shared-core and app suites). Delivered as
+`app-bottom-player-debug.apk` (see BUILD-LOG.md → APK deliveries).
 **Built, not ready — only Collin's phone test proves the bar.**
 
 ## What Collin asked
@@ -134,12 +137,17 @@ No change: pages under the top-docked shell already keep
   `playerLayoutFor` tests unchanged.
 - New `PlayerBarTest` (3 tests): song → line; live station → no line;
   nothing loaded → no line.
-- Net test count vs Phase 4: −(BubbleGestureTest + BubbleMathTest) + 3.
+- Net test count vs Phase 4: −(BubbleGestureTest 11 + BubbleMathTest 9)
+  + PlayerBarTest 3 = −17, which reconciles exactly with CI's count:
+  6,469 (Phase 4) → 6,452.
 
 ## Honest gaps
 
-- **Nothing here has been seen on a phone, or even compiled locally** —
-  Gradle cannot run on this VM; CI is the first compile.
+- **Nothing here has been seen on a phone** — CI compiled it and the full
+  suite passed first try, and the delivered APK was verified (package,
+  signature, dex contains BottomPlayerBar and zero bubble classes, seed
+  asset still 1000/1000), but the bar's feel is unproven until Collin
+  uses it.
 - Touch accuracy of the 40 dp transport buttons beside the whole-bar tap,
   and how the 64 dp bar sits over each page's last row, need Collin's
   device test.

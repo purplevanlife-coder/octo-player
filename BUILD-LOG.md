@@ -67,6 +67,7 @@ Started: 2026-11-19 (America/Los_Angeles).
 | 44829046266 | feature/discover-v1 | (same tree) | **failure** | Same pattern, different test: 1 failure, `MixThreadingTest` (threading). Re-dispatched unchanged. |
 | 44836232252 | feature/discover-v1 | (same tree) | **failure** | Same pattern again: 1 failure, `LikedHiddenRaceTest` (the same race test that flaked in the Phase 2 components round). Re-dispatched unchanged. |
 | 44842767691 | feature/discover-v1 | (same tree) | **SUCCESS** | **Phase 4 green.** Shared-core + app suites: **6,469 tests, 0 failures, 0 errors** (18 skipped). APK delivered as `app-music-space-player2-debug.apk` (98,736,597 bytes); see the Phase 4 section. |
+| 44854313870 | feature/discover-v1 | Phase 5 (b358fd8c remote) | **SUCCESS** | **Phase 5 green, first run.** Shared-core + app suites: **6,452 tests, 0 failures, 0 errors** (18 skipped) — Phase 4's 6,469 − 20 removed bubble tests + 3 new PlayerBarTest. APK delivered as `app-bottom-player-debug.apk` (98,654,677 bytes); see the Phase 5 section. |
 
 ### Phase 2 foundation — Music Space theme (2026-11-20, Claude Code session, ~16 min)
 
@@ -307,8 +308,12 @@ full write-up: `PHASE5-NOTES.md`. Gradle not run (cannot work on this VM).
 
 - **Tests:** ThemeLayoutTest updated; new PlayerBarTest (3 tests);
   BubbleGestureTest/BubbleMathTest removed with their code.
-- **CI result:** pending CI.
-- **APK delivery:** pending CI.
+- **CI result (coordinator follow-up):** run **44854313870 SUCCESS on the
+  first run** — shared-core + app suites, **6,452 tests, 0 failures,
+  0 errors** (18 skipped), counted from the run's test reports (1,071
+  suites). Phase 4's 6,469 minus the 20 removed bubble tests plus
+  PlayerBarTest's 3 reconciles exactly. No flake re-runs were needed.
+- **APK delivery:** `app-bottom-player-debug.apk` (see APK deliveries).
 
 ## Notes
 
@@ -362,6 +367,20 @@ full write-up: `PHASE5-NOTES.md`. Gradle not run (cannot work on this VM).
   installing over the Phase 3 build will likely require uninstalling it
   first (which loses that build's local Discover dismissals). The fork
   still has NO fixed keystore.
+- **Phase 5 (bottom player bar, bubble + pill retired):
+  `~/workspace/your_files/octo-player-debug/app-bottom-player-debug.apk`**
+  — from run 44854313870 (feature/discover-v1 @ b358fd8c remote),
+  98,654,677 bytes, SHA-256
+  8def0eac7f12386257043b914ffe59457d7395c8ad9b5388e21e619877cd0764,
+  package app.winters.octo.debug, versionName 0.2.0-debug, aapt2 +
+  apksigner verified, dex contains BottomPlayerBar / PlayerBarActions /
+  playerBarShowsProgress and ZERO references to NowPlayingBubble,
+  BubbleGestureMachine, BubbleMath or BubbleStore; CirclePlayer,
+  Discover and the Takeout seed asset (read back at v2, 1000 artists /
+  1000 tracks) all still inside. Earlier APKs stay in place untouched.
+  Same per-run debug-key caveat: installing over the Phase 4 build will
+  likely require uninstalling it first (which loses that build's local
+  Discover dismissals). The fork still has NO fixed keystore.
 
 ### Phase 1 — Discover v1 implemented (2026-11-19, Claude Code session, ~25 min)
 
